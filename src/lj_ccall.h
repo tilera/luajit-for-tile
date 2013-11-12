@@ -105,6 +105,17 @@ typedef union FPRArg {
   struct { LJ_ENDIAN_LOHI(float f; , float g;) };
 } FPRArg;
 
+#elif LJ_TARGET_TILEGX
+
+#define CCALL_NARG_GPR		4
+#define CCALL_NARG_FPR		2
+#define CCALL_NRET_GPR		2
+#define CCALL_NRET_FPR		2
+#define CCALL_SPS_EXTRA		7
+#define CCALL_SPS_FREE		1
+
+typedef intptr_t GPRArg;
+
 #else
 #error "Missing calling convention definitions for this architecture"
 #endif

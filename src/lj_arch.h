@@ -25,6 +25,8 @@
 #define LUAJIT_ARCH_ppcspe	5
 #define LUAJIT_ARCH_MIPS	6
 #define LUAJIT_ARCH_mips	6
+#define LUAJIT_ARCH_TILEGX	7
+#define LUAJIT_ARCH_tilegx	7
 
 /* Target OS. */
 #define LUAJIT_OS_OTHER		0
@@ -51,6 +53,8 @@
 #endif
 #elif defined(__mips__) || defined(__mips) || defined(__MIPS__) || defined(__MIPS)
 #define LUAJIT_TARGET	LUAJIT_ARCH_MIPS
+#elif defined(__tilegx__) || defined(__tilegx)
+#define LUAJIT_TARGET	LUAJIT_ARCH_TILEGX
 #else
 #error "No support for this architecture (yet)"
 #endif
@@ -267,6 +271,20 @@
 #else
 #define LJ_ARCH_VERSION		10
 #endif
+
+#elif LUAJIT_TARGET == LUAJIT_ARCH_TILEGX
+
+#define LJ_ARCH_NAME		"tilegx"
+#define LJ_ARCH_ENDIAN		LUAJIT_LE
+#define LJ_ARCH_BITS		64
+#define LJ_TARGET_TILEGX	1
+#define LJ_TARGET_EHRETREG	4
+// FIXME
+#define LJ_TARGET_JUMPRANGE	30	/* 2^30 = 1G-aligned region */ 
+#define LJ_TARGET_MASKSHIFT	1
+#define LJ_TARGET_MASKROT	1
+#define LJ_TARGET_UNIFYROT	2	/* Want only IR_BROR. */
+#define LJ_ARCH_NUMMODE		LJ_NUMMODE_SINGLE
 
 #else
 #error "No target architecture defined"

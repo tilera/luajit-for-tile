@@ -54,6 +54,7 @@ CCOPT_arm=
 CCOPT_ppc=
 CCOPT_ppcspe=
 CCOPT_mips=
+CCOPT_tilegx=
 #
 CCDEBUG=
 # Uncomment the next line to generate debug information:
@@ -228,7 +229,11 @@ ifneq (,$(findstring LJ_TARGET_MIPS ,$(TARGET_TESTARCH)))
   endif
   TARGET_LJARCH= mips
 else
+ifneq (,$(findstring LJ_TARGET_TILEGX ,$(TARGET_TESTARCH)))
+  TARGET_LJARCH= tilegx
+else
   $(error Unsupported target architecture)
+endif
 endif
 endif
 endif
