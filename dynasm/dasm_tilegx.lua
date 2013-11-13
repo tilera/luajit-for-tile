@@ -240,8 +240,12 @@ local map_op = {
   shl16insli_3 =	"3800000051483000DAI",
   sub_3 =		"2868000051483000DAB",
 
+  -- Memory Instructions.
+  st_2 =		"DE064000340C3000ba",
+  ld_2 =		"9E064000340C3000ba",
+
   -- Control Instructions.
-  jr_1 =		"286a700051483000A",
+  jr_1 =		"286A700051483000A",
 }
 
 ------------------------------------------------------------------------------
@@ -332,6 +336,8 @@ map_op[".template__"] = function(params, template, nparams)
 
   -- Process each character.
   for p in gmatch(sub(template, 17), ".") do
+
+    -- X mode
     if p == "A" then
       op = op + shll(parse_gpr(params[n]), 37); n = n + 1
     elseif p == "B" then
@@ -342,6 +348,12 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + shll(parse_imm(params[n], 16, 0, 0, true), 43); n = n + 1
     elseif p == "i" then
       op = op + shll(parse_imm(params[n], 8, 0, 0, true), 43); n = n + 1
+
+    -- Y mode
+    elseif p == "a" then
+      op = op + shll(parse_gpr(params[n]), 20); n = n + 1
+    elseif p == "b" then
+      op = op + shll(parse_gpr(params[n]), 51); n = n + 1
     else
       assert(false)
     end

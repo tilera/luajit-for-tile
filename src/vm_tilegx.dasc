@@ -20,19 +20,18 @@
 |// Don't use: r0 = 0, r26/r27 = reserved, r28 = gp, r29 = sp, r31 = ra
 |
 |// The following must be C callee-save (but BASE is often refetched).
-|.define BASE,		r16	// Base of current Lua stack frame.
-|.define KBASE,		r17	// Constants of current Lua function.
-|.define PC,		r18	// Next PC.
-|.define DISPATCH,	r19	// Opcode dispatch table.
-|.define LREG,		r20	// Register holding lua_State (also in SAVE_L).
-|.define MULTRES,	r21	// Size of multi-result: (nresults+1)*8.
+|.define BASE,		r30	// Base of current Lua stack frame.
+|.define KBASE,		r31	// Constants of current Lua function.
+|.define PC,		r32	// Next PC.
+|.define DISPATCH,	r33	// Opcode dispatch table.
+|.define LREG,		r34	// Register holding lua_State (also in SAVE_L).
+|.define MULTRES,	r35	// Size of multi-result: (nresults+1)*8.
 |// NYI: r22 currently unused.
 |
-|.define JGL,		r30	// On-trace: global_State + 32768.
+|.define JGL,		r52	// On-trace: global_State + 32768.
 |
 |// Constants for type-comparisons, stores and conversions. C callee-save.
-|.define TISNIL,	r30
-|.define TOBIT,		f30	// 2^52 + 2^51.
+|.define TISNIL,	r52
 |
 |// The following temporaries are not saved across C calls, except for RA.
 |.define RA,		r23	// Callee-save.
@@ -57,72 +56,68 @@
 |.define CRET1,		r2
 |.define CRET2,		r3
 |
-|.define FARG1,		f12
-|.define FARG2,		f14
-|
-|.define FRET1,		f0
-|.define FRET2,		f2
-|
 |// Stack layout while in interpreter. Must match with lj_frame.h.
-|.define CFRAME_SPACE,	112	// Delta for sp.
+|.define CFRAME_SPACE,	96	// Delta for sp.
 |
-|.define SAVE_ERRF,	124(sp)	// 32 bit C frame info.
-|.define SAVE_NRES,	120(sp)
-|.define SAVE_CFRAME,	116(sp)
-|.define SAVE_L,	112(sp)
+|.define SAVE_ERRF,	120(sp)	// 64 bit C frame info.
+|.define SAVE_NRES,	112(sp)
+|.define SAVE_CFRAME,	104(sp)
+|.define SAVE_L,	96(sp)
 |//----- 8 byte aligned, ^^^^ 16 byte register save area, owned by interpreter.
-|.define SAVE_GPR_,	72	// .. 72+10*4: 32 bit GPR saves.
-|.define SAVE_FPR_,	24	// .. 24+6*8: 64 bit FPR saves.
-|.define SAVE_PC,	20(sp)
-|.define ARG5,		16(sp)
-|.define CSAVE_4,	12(sp)
-|.define CSAVE_3,	8(sp)
-|.define CSAVE_2,	4(sp)
-|.define CSAVE_1,	0(sp)
+|.define SAVE_GPR_,	16	// .. 16+10*8: 64 bit GPR saves.
+|.define SAVE_OSP,	8(sp)
+|.define SAVE_PC,	0(sp)
 |//----- 8 byte aligned, ^^^^ 16 byte register save area, owned by callee.
 |
 |.define ARG5_OFS,	16
 |.define SAVE_MULTRES,	ARG5
 |
 |.macro saveregs
-|  addiu sp, sp, -CFRAME_SPACE
-|  sw ra, SAVE_GPR_+9*4(sp)
-|  sw r30, SAVE_GPR_+8*4(sp)
-|   sdc1 f30, SAVE_FPR_+5*8(sp)
-|  sw r23, SAVE_GPR_+7*4(sp)
-|  sw r22, SAVE_GPR_+6*4(sp)
-|   sdc1 f28, SAVE_FPR_+4*8(sp)
-|  sw r21, SAVE_GPR_+5*4(sp)
-|  sw r20, SAVE_GPR_+4*4(sp)
-|   sdc1 f26, SAVE_FPR_+3*8(sp)
-|  sw r19, SAVE_GPR_+3*4(sp)
-|  sw r18, SAVE_GPR_+2*4(sp)
-|   sdc1 f24, SAVE_FPR_+2*8(sp)
-|  sw r17, SAVE_GPR_+1*4(sp)
-|  sw r16, SAVE_GPR_+0*4(sp)
-|   sdc1 f22, SAVE_FPR_+1*8(sp)
-|   sdc1 f20, SAVE_FPR_+0*8(sp)
+|  addi sp, sp, -(SAVE_GPR_ + 8)
+|  st sp, r30
+|  addi sp, sp, -8
+|  st sp, r31
+|  addi sp, sp, -8
+|  st sp, r32
+|  addi sp, sp, -8
+|  st sp, r33
+|  addi sp, sp, -8
+|  st sp, r34
+|  addi sp, sp, -8
+|  st sp, r35
+|  addi sp, sp, -8
+|  st sp, r36
+|  addi sp, sp, -8
+|  st sp, r37
+|  addi sp, sp, -8
+|  st sp, r52
+|  addi sp, sp, -8
+|  st sp, lr
 |.endmacro
 |
 |.macro restoreregs_ret
-|  lw ra, SAVE_GPR_+9*4(sp)
-|  lw r30, SAVE_GPR_+8*4(sp)
-|   ldc1 f30, SAVE_FPR_+5*8(sp)
-|  lw r23, SAVE_GPR_+7*4(sp)
-|  lw r22, SAVE_GPR_+6*4(sp)
-|   ldc1 f28, SAVE_FPR_+4*8(sp)
-|  lw r21, SAVE_GPR_+5*4(sp)
-|  lw r20, SAVE_GPR_+4*4(sp)
-|   ldc1 f26, SAVE_FPR_+3*8(sp)
-|  lw r19, SAVE_GPR_+3*4(sp)
-|  lw r18, SAVE_GPR_+2*4(sp)
-|   ldc1 f24, SAVE_FPR_+2*8(sp)
-|  lw r17, SAVE_GPR_+1*4(sp)
-|  lw r16, SAVE_GPR_+0*4(sp)
-|   ldc1 f22, SAVE_FPR_+1*8(sp)
-|   ldc1 f20, SAVE_FPR_+0*8(sp)
-|  jr ra
-|  addiu sp, sp, CFRAME_SPACE
+|  addi sp, sp, SAVE_GPR_
+|  ld r30, sp
+|  addi sp, sp, 8
+|  ld r31, sp
+|  addi sp, sp, 8
+|  ld r32, sp
+|  addi sp, sp, 8
+|  ld r33, sp
+|  addi sp, sp, 8
+|  ld r34, sp
+|  addi sp, sp, 8
+|  ld r35, sp
+|  addi sp, sp, 8
+|  ld r36, sp
+|  addi sp, sp, 8
+|  ld r37, sp
+|  addi sp, sp, 8
+|  ld r52, sp
+|  addi sp, sp, 8
+|  ld lr, sp
+|  addi sp, sp, 8
+|  jr lr
 |.endmacro
 |
 |// Type definitions. Some of these are only used for documentation.
