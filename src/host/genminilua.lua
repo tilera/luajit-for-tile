@@ -59,13 +59,21 @@ local REMOVE_EXTINC = { ["<assert.h>"] = true, ["<locale.h>"] = true, }
 
 local CUSTOM_MAIN = [[
 typedef unsigned int UB;
+typedef unsigned long ULB;
 static UB barg(lua_State *L,int idx){
 union{lua_Number n;U64 b;}bn;
 bn.n=lua_tonumber(L,idx)+6755399441055744.0;
 if (bn.n==0.0&&!lua_isnumber(L,idx))luaL_typerror(L,idx,"number");
 return(UB)bn.b;
 }
+static UBL barg64(lua_State *L,int idx){
+union{lua_Number n;U64 b;}bn;
+bn.n=lua_tonumber(L,idx)+6755399441055744.0;
+if (bn.n==0.0&&!lua_isnumber(L,idx))luaL_typerror(L,idx,"number");
+return(UBL)bn.b;
+}
 #define BRET(b) lua_pushnumber(L,(lua_Number)(int)(b));return 1;
+#define BRET64(b) lua_pushnumber(L,(lua_Number)(long)(b));return 1;
 static int tobit(lua_State *L){
 BRET(barg(L,1))}
 static int bnot(lua_State *L){
@@ -78,6 +86,8 @@ static int bxor(lua_State *L){
 int i;UB b=barg(L,1);for(i=lua_gettop(L);i>1;i--)b^=barg(L,i);BRET(b)}
 static int lshift(lua_State *L){
 UB b=barg(L,1),n=barg(L,2)&31;BRET(b<<n)}
+static long llshift(lua_State *L){
+ULB b=barg64(L,1),n=barg64(L,2)&63;BRET64(b<<n)}
 static int rshift(lua_State *L){
 UB b=barg(L,1),n=barg(L,2)&31;BRET(b>>n)}
 static int arshift(lua_State *L){
@@ -113,6 +123,7 @@ static const struct luaL_Reg bitlib[] = {
 {"ror",ror},
 {"bswap",bswap},
 {"tohex",tohex},
+{"llshift",(lua_CFunction)llshift},
 {NULL,NULL}
 };
 int main(int argc, char **argv){

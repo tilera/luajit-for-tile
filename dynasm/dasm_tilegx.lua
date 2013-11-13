@@ -28,7 +28,7 @@ local sub, format, byte, char = _s.sub, _s.format, _s.byte, _s.char
 local match, gmatch = _s.match, _s.gmatch
 local concat, sort = table.concat, table.sort
 local bit = bit or require("bit")
-local band, shl, sar, tohex = bit.band, bit.lshift, bit.arshift, bit.tohex
+local band, shl, shll, sar = bit.band, bit.lshift, bit.llshift, bit.arshift
 
 -- Inherited tables and callbacks.
 local g_opt, g_arch
@@ -210,7 +210,7 @@ end
 ------------------------------------------------------------------------------
 
 -- Arch-specific maps.
-local map_archdef = { sp="r54", lr="r55" } -- Ext. register name -> int. name.
+local map_archdef = { sp="r54", lr="r55", zero="r63" } -- Ext. register name -> int. name.
 
 local map_type = {}		-- Type name -> { ctype, reg }
 local ctypenum = 0		-- Type number (for Dt... macros).
@@ -218,7 +218,8 @@ local ctypenum = 0		-- Type number (for Dt... macros).
 -- Reverse defines for registers.
 function _M.revdef(s)
   if s == "r54" then return "sp"
-  elseif s == "r55" then return "lr" end
+  elseif s == "r55" then return "lr"
+  elseif s == "r63" then return "zero" end
   return s
 end
 
@@ -332,15 +333,15 @@ map_op[".template__"] = function(params, template, nparams)
   -- Process each character.
   for p in gmatch(sub(template, 17), ".") do
     if p == "A" then
-      op = op + shl(parse_gpr(params[n]), 37); n = n + 1
+      op = op + shll(parse_gpr(params[n]), 37); n = n + 1
     elseif p == "B" then
-      op = op + shl(parse_gpr(params[n]), 43); n = n + 1
+      op = op + shll(parse_gpr(params[n]), 43); n = n + 1
     elseif p == "D" then
-      op = op + shl(parse_gpr(params[n]), 31); n = n + 1
+      op = op + shll(parse_gpr(params[n]), 31); n = n + 1
     elseif p == "I" then
-      op = op + shl(parse_imm(params[n], 16, 0, 0, true), 43); n = n + 1
+      op = op + shll(parse_imm(params[n], 16, 0, 0, true), 43); n = n + 1
     elseif p == "i" then
-      op = op + shl(parse_imm(params[n], 8, 0, 0, true), 43); n = n + 1
+      op = op + shll(parse_imm(params[n], 8, 0, 0, true), 43); n = n + 1
     else
       assert(false)
     end
