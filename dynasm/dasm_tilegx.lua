@@ -240,9 +240,24 @@ local map_op = {
   shl16insli_3 =	"3800000051483000DAI",
   sub_3 =		"2868000051483000DAB",
 
+  -- Logical Instructions.
+  and_3 =		"2808000051483000DAB",  
+  or_3 =		"283a000051483000DAB",  
+  andi_3 =		"1818000051483000DAi",
+  ori_3 =		"18c0000051483000DAi",
+  shl_3 =		"284c000051483000DAB",
+  shli_3 =		"3004000051483000DAi",
+  shru_3 =		"2852000051483000DAB",
+  shrui_3 =		"300a000051483000DAi",
+  shrs_3 =		"284e000051483000DAB",
+  shrsi_3 =		"3008000051483000DAi",
+  bfextu_4 =		"286a300035000000EFGH",
+  bfexts_4 =		"286a300034000000EFGH",
+
   -- Memory Instructions.
   st_2 =		"DE064000340C3000ba",
   ld_2 =		"9E064000340C3000ba",
+  ld4u_2 =		"9E064000300C3000ba",
 
   -- Control Instructions.
   jr_1 =		"286A700051483000A",
@@ -344,6 +359,14 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + shll(parse_gpr(params[n]), 43); n = n + 1
     elseif p == "D" then
       op = op + shll(parse_gpr(params[n]), 31); n = n + 1
+    elseif p == "E" then
+      op = op + parse_gpr(params[n]); n = n + 1
+    elseif p == "F" then
+      op = op + shll(parse_gpr(params[n]), 6); n = n + 1
+    elseif p == "G" then
+      op = op + shll(parse_imm(params[n], 6, 0, 0, false), 18); n = n + 1
+    elseif p == "H" then
+      op = op + shll(parse_imm(params[n], 6, 0, 0, false), 12); n = n + 1
     elseif p == "I" then
       op = op + shll(parse_imm(params[n], 16, 0, 0, true), 43); n = n + 1
     elseif p == "i" then

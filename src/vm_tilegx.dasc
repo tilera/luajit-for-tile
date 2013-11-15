@@ -157,36 +157,36 @@
 |.define OFS_OP,	LJ_ENDIAN_SELECT(0,3)
 |
 |// Instruction decode.
-|.macro decode_OP1, dst, ins; andi dst, ins, 0xff; .endmacro
-|.macro decode_OP4a, dst, ins; andi dst, ins, 0xff; .endmacro
-|.macro decode_OP4b, dst; sll dst, dst, 2; .endmacro
-|.macro decode_RC4a, dst, ins; srl dst, ins, 14; .endmacro
-|.macro decode_RC4b, dst; andi dst, dst, 0x3fc; .endmacro
-|.macro decode_RD4b, dst; sll dst, dst, 2; .endmacro
-|.macro decode_RA8a, dst, ins; srl dst, ins, 5; .endmacro
-|.macro decode_RA8b, dst; andi dst, dst, 0x7f8; .endmacro
-|.macro decode_RB8a, dst, ins; srl dst, ins, 21; .endmacro
-|.macro decode_RB8b, dst; andi dst, dst, 0x7f8; .endmacro
-|.macro decode_RD8a, dst, ins; srl dst, ins, 16; .endmacro
-|.macro decode_RD8b, dst; sll dst, dst, 3; .endmacro
-|.macro decode_RDtoRC8, dst, src; andi dst, src, 0x7f8; .endmacro
+|.macro decode_OP1, dst, ins; bfextu dst, ins, 0, 7; .endmacro
+|.macro decode_OP4a, dst, ins; bfextu dst, ins, 0, 7; .endmacro
+|.macro decode_OP4b, dst; shli dst, dst, 3; .endmacro
+|.macro decode_RC4a, dst, ins; shrui dst, ins, 14; .endmacro
+|.macro decode_RC4b, dst; bfextu dst, dst, 2, 9; .endmacro
+|.macro decode_RD4b, dst; shli dst, dst, 2; .endmacro
+|.macro decode_RA8a, dst, ins; shrui dst, ins, 5; .endmacro
+|.macro decode_RA8b, dst; bfextu dst, dst, 3, 10; .endmacro
+|.macro decode_RB8a, dst, ins; shrui dst, ins, 21; .endmacro
+|.macro decode_RB8b, dst; bfextu dst, dst, 3, 10; .endmacro
+|.macro decode_RD8a, dst, ins; shrui dst, ins, 16; .endmacro
+|.macro decode_RD8b, dst; shli dst, dst, 3; .endmacro
+|.macro decode_RDtoRC8, dst, src; bfextu dst, src, 3, 10; .endmacro
 |
 |// Instruction fetch.
 |.macro ins_NEXT1
-|  lw INS, 0(PC)
-|   addiu PC, PC, 4
+|  ld4u INS, PC
+|   addi PC, PC, 4
 |.endmacro
 |// Instruction decode+dispatch.
 |.macro ins_NEXT2
 |  decode_OP4a TMP1, INS
 |  decode_OP4b TMP1
-|  addu TMP0, DISPATCH, TMP1
+|  add TMP0, DISPATCH, TMP1
 |   decode_RD8a RD, INS
-|  lw AT, 0(TMP0)
+|  ld AT, TMP0
 |   decode_RA8a RA, INS
 |   decode_RD8b RD
-|  jr AT
 |   decode_RA8b RA
+|  jr AT
 |.endmacro
 |.macro ins_NEXT
 |  ins_NEXT1
@@ -220,22 +220,22 @@
 |// Call decode and dispatch.
 |.macro ins_callt
 |  // BASE = new base, RB = LFUNC/CFUNC, RC = nargs*8, FRAME_PC(BASE) = PC
-|  lw PC, LFUNC:RB->pc
-|  lw INS, 0(PC)
-|   addiu PC, PC, 4
+|  ld4u PC, LFUNC:RB->pc
+|  ld4u INS, 0(PC)
+|   addi PC, PC, 4
 |  decode_OP4a TMP1, INS
 |   decode_RA8a RA, INS
 |  decode_OP4b TMP1
 |   decode_RA8b RA
-|  addu TMP0, DISPATCH, TMP1
+|  add TMP0, DISPATCH, TMP1
 |  lw TMP0, 0(TMP0)
+|  addu RA, RA, BASE
 |  jr TMP0
-|   addu RA, RA, BASE
 |.endmacro
 |
 |.macro ins_call
 |  // BASE = new base, RB = LFUNC/CFUNC, RC = nargs*8, PC = caller PC
-|  sw PC, FRAME_PC(BASE)
+|  st4 PC, FRAME_PC(BASE)
 |  ins_callt
 |.endmacro
 |
