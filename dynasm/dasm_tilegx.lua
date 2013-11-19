@@ -38,7 +38,7 @@ local wline, werror, wfatal, wwarn
 -- CHECK: Keep this in sync with the C code!
 local action_names = {
   "STOP", "SECTION", "ESC", "REL_EXT",
-  "ALIGN", "REL_LG", "LABEL_LG",
+  "ALIGN", "REL_LG_X1_BR", "REL_LG_X1_J", "LABEL_LG",
   "REL_PC", "LABEL_PC", "IMM",
 }
 
@@ -95,7 +95,7 @@ end
 -- Add action to list with optional arg. Advance buffer pos, too.
 local function waction(action, val, a, num)
   local w = assert(map_action[action], "bad action name `"..action.."'")
-  wputxw(0xff00000000000000 + w * 0x1000000000000 + (val or 0))
+  wputxw(0xff00000000000000 + w * 0x1000000000000 + (val or 0) * 0x1000)
   if a then actargs[#actargs+1] = a end
   if a or num then secpos = secpos + (num or 1) end
 end
@@ -261,6 +261,8 @@ local map_op = {
 
   -- Control Instructions.
   jr_1 =		"286A700051483000A",
+  beqz_2 =		"1440000051483000AK",
+  bnez_2 =		"17c0000051483000AK",
 }
 
 ------------------------------------------------------------------------------
@@ -371,6 +373,12 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + shll(parse_imm(params[n], 16, 0, 0, true), 43); n = n + 1
     elseif p == "i" then
       op = op + shll(parse_imm(params[n], 8, 0, 0, true), 43); n = n + 1
+    elseif p == "K" then
+      local mode, n, s = parse_label(params[n], false)
+      waction("REL_"..mode.."_X1_BR", n, s, 1)
+    elseif p == "J" then
+      local mode, n, s = parse_label(params[n], false)
+      waction("REL_"..mode.."_X1_J", n, s, 1)
 
     -- Y mode
     elseif p == "a" then
