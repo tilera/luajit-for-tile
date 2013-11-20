@@ -17,7 +17,7 @@
 |//-----------------------------------------------------------------------
 |
 |// Fixed register assignments for the interpreter.
-|// Don't use: r0 = 0, r26/r27 = reserved, r28 = gp, r29 = sp, r31 = ra
+|// Don't use: r51 = gp, r53 = tp, r54 = sp, r55 = lr.
 |
 |// The following must be C callee-save (but BASE is often refetched).
 |.define BASE,		r30	// Base of current Lua stack frame.
@@ -26,7 +26,8 @@
 |.define DISPATCH,	r33	// Opcode dispatch table.
 |.define LREG,		r34	// Register holding lua_State (also in SAVE_L).
 |.define MULTRES,	r35	// Size of multi-result: (nresults+1)*8.
-|// NYI: r22 currently unused.
+|//                     r36     // not used.
+|.define RA,		r37	// RA need to be callee-save.
 |
 |.define JGL,		r52	// On-trace: global_State + 32768.
 |
@@ -34,27 +35,32 @@
 |.define TISNIL,	r52
 |
 |// The following temporaries are not saved across C calls, except for RA.
-|.define RA,		r23	// Callee-save.
-|.define RB,		r8
-|.define RC,		r9
-|.define RD,		r10
-|.define INS,		r11
+|.define RB,		r19
+|.define RC,		r20
+|.define RD,		r21
+|.define INS,		r22
 |
-|.define AT,		r1	// Assembler temporary.
-|.define TMP0,		r12
-|.define TMP1,		r13
-|.define TMP2,		r14
-|.define TMP3,		r15
+|.define TMP0,		r23
+|.define TMP1,		r24
+|.define TMP2,		r25
+|.define TMP3,		r26
 |
+|.define AT0,		r27
+|.define AT1,		r28
+
 |// Calling conventions.
-|.define CFUNCADDR,	r25
-|.define CARG1,		r4
-|.define CARG2,		r5
-|.define CARG3,		r6
-|.define CARG4,		r7
+|// TileGX PIC don't require function address pre-loaded into a specific
+|// reg, because we have instruction (lnk) which could get the current pc,
+|// so here we just specify one caller-saved reg r29 to hold the func addr.
+|.define CFUNCADDR,	r29
+|.define CARG1,		r0
+|.define CARG2,		r1
+|.define CARG3,		r2
+|.define CARG4,		r3
 |
-|.define CRET1,		r2
-|.define CRET2,		r3
+|// TileGX ABI use r0 ~ r9 as both arg passing and value returning.
+|.define CRET1,		r0
+|.define CRET2,		r1
 |
 |// Stack layout while in interpreter. Must match with lj_frame.h.
 |.define CFRAME_SPACE,	96	// Delta for sp.
