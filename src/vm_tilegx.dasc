@@ -70,7 +70,7 @@
 |.define SAVE_CFRAME,	104(sp)
 |.define SAVE_L,	96(sp)
 |//----- 8 byte aligned, ^^^^ 16 byte register save area, owned by interpreter.
-|.define SAVE_GPR_,	16	// .. 16+10*8: 64 bit GPR saves.
+|.define TILE_ABI_RESERV,	16	// .. 16+10*8: 64 bit GPR saves.
 |.define SAVE_OSP,	8(sp)
 |.define SAVE_PC,	0(sp)
 |//----- 8 byte aligned, ^^^^ 16 byte register save area, owned by callee.
@@ -79,7 +79,7 @@
 |.define SAVE_MULTRES,	ARG5
 |
 |.macro saveregs
-|  addi sp, sp, -(SAVE_GPR_ + 8)
+|  addi sp, sp, -40 // 8 + 32
 |  st sp, r30
 |  addi sp, sp, -8
 |  st sp, r31
@@ -99,30 +99,31 @@
 |  st sp, r52
 |  addi sp, sp, -8
 |  st sp, lr
+|  addi sp, sp, -TILE_ABI_RESERV
 |.endmacro
 |
 |.macro restoreregs_ret
-|  addi sp, sp, SAVE_GPR_
-|  ld r30, sp
-|  addi sp, sp, 8
-|  ld r31, sp
-|  addi sp, sp, 8
-|  ld r32, sp
-|  addi sp, sp, 8
-|  ld r33, sp
-|  addi sp, sp, 8
-|  ld r34, sp
-|  addi sp, sp, 8
-|  ld r35, sp
-|  addi sp, sp, 8
-|  ld r36, sp
-|  addi sp, sp, 8
-|  ld r37, sp
+|  addi sp, sp, TILE_ABI_RESERV
+|  ld lr, sp
 |  addi sp, sp, 8
 |  ld r52, sp
 |  addi sp, sp, 8
-|  ld lr, sp
+|  ld r37, sp
 |  addi sp, sp, 8
+|  ld r36, sp
+|  addi sp, sp, 8
+|  ld r35, sp
+|  addi sp, sp, 8
+|  ld r34, sp
+|  addi sp, sp, 8
+|  ld r33, sp
+|  addi sp, sp, 8
+|  ld r32, sp
+|  addi sp, sp, 8
+|  ld r31, sp
+|  addi sp, sp, 8
+|  ld 30, sp
+|  addi sp, sp, 40
 |  jr lr
 |.endmacro
 |
