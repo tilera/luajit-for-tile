@@ -65,14 +65,14 @@
 |// Stack layout while in interpreter. Must match with lj_frame.h.
 |.define CFRAME_SPACE,	96	// Delta for sp.
 |
-|.define SAVE_ERRF,	120(sp)	// 64 bit C frame info.
-|.define SAVE_NRES,	112(sp)
-|.define SAVE_CFRAME,	104(sp)
-|.define SAVE_L,	96(sp)
+|.define SAVE_ERRF,	120	// 64 bit C frame info.
+|.define SAVE_NRES,	112
+|.define SAVE_CFRAME,	104
+|.define SAVE_L,	96
 |//----- 8 byte aligned, ^^^^ 16 byte register save area, owned by interpreter.
 |.define TILE_ABI_RESERV,	16	// .. 16+10*8: 64 bit GPR saves.
-|.define SAVE_OSP,	8(sp)
-|.define SAVE_PC,	0(sp)
+|.define SAVE_OSP,	8
+|.define SAVE_PC,	0
 |//----- 8 byte aligned, ^^^^ 16 byte register save area, owned by callee.
 |
 |.define ARG5_OFS,	16
@@ -291,8 +291,8 @@
 |.endmacro
 |
 |// Set current VM state. Uses TMP0.
-|.macro li_vmstate, st; li TMP0, ~LJ_VMST_..st; .endmacro
-|.macro st_vmstate; sw TMP0, DISPATCH_GL(vmstate)(DISPATCH); .endmacro
+|.macro li_vmstate, st; moveli TMP0, ~LJ_VMST_..st; .endmacro
+|.macro st_vmstate; addli AT0, DISPATCH, DISPATCH_GL(vmstate); st AT0, TMP0; .endmacro
 |
 |// Move table write barrier back. Overwrites mark and tmp.
 |.macro barrierback, tab, mark, tmp, target
@@ -539,16 +539,15 @@ static void build_subroutines(BuildCtx *ctx)
   |    addiu DISPATCH, DISPATCH, GG_G2DISP
   |
   |3:  // Entry point for vm_cpcall/vm_resume (BASE = base, PC = ftype).
-  |  lw TMP2, L->base			// TMP2 = old base (used in vmeta_call).
-  |     lui TMP3, 0x59c0		// TOBIT = 2^52 + 2^51 (float).
-  |   lw TMP1, L->top
-  |     mtc1 TMP3, TOBIT
-  |  addu PC, PC, BASE
-  |   subu NARGS8:RC, TMP1, BASE
+  |  addlo AT0, L:LREG->base		
+  |  ld TMP2, AT0			// TMP2 = old base (used in vmeta_call).
+  |  addlo AT0, L:LREG->top		
+  |   ld TMP1, AT0
+  |  add PC, PC, BASE
+  |   sub NARGS8:RC, TMP1, BASE
   |  subu PC, PC, TMP2			// PC = frame delta + frame type
-  |     cvt.d.s TOBIT, TOBIT
   |    li_vmstate INTERP
-  |     li TISNIL, LJ_TNIL
+  |     moveli TISNIL, LJ_TNIL
   |    st_vmstate
   |
   |->vm_call_dispatch:
@@ -566,23 +565,30 @@ static void build_subroutines(BuildCtx *ctx)
   |  // (lua_State *L, lua_CFunction func, void *ud, lua_CPFunction cp)
   |  saveregs
   |  move L, CARG1
-  |   lw TMP0, L:CARG1->stack
-  |  sw CARG1, SAVE_L
-  |   lw TMP1, L->top
-  |  sw CARG1, SAVE_PC			// Any value outside of bytecode is ok.
-  |   subu TMP0, TMP0, TMP1		// Compute -savestack(L, L->top).
-  |    lw TMP1, L->cframe
-  |    sw sp, L->cframe			// Add our C frame to cframe chain.
-  |   sw TMP0, SAVE_NRES		// Neg. delta means cframe w/o frame.
-  |  sw r0, SAVE_ERRF			// No error function.
-  |  move CFUNCADDR, CARG4
+  |   addlo TMP0, L:CARG1->stack
+  |   ld4u TMP0, TMP0
+  |  addi AT0, sp, SAVE_L
+  |  st AT0, CARG1
+  |   addlo TMP1, L:CARG1->top
+  |   ld TMP1, TMP1
+  |  st sp, CARG1			// Any value outside of bytecode is ok.
+  |   sub TMP0, TMP0, TMP1		// Compute -savestack(L, L->top).
+  |   addlo AT0, L:CARG1->cframe
+  |    ld TMP1, AT0
+  |    st AT0, sp			// Add our C frame to cframe chain.
+  |   addi AT0, sp, SAVE_NRES		// Neg. delta means cframe w/o frame.
+  |    st AT0, TMP0
+  |  addi AT0, sp, SAVE_ERRF		// No error function.
+  |   st AT0, r0
+  |  addi AT0, sp, SAVE_CFRAME
+  |  st AT0, TMP1
   |  jalr CARG4			// (lua_State *L, lua_CFunction func, void *ud)
-  |.   sw TMP1, SAVE_CFRAME
   |  move BASE, CRET1
-  |   lw DISPATCH, L->glref		// Setup pointer to dispatch table.
-  |    li PC, FRAME_CP
+  |   addlo DISPATCH, L:LREG->glref	// Setup pointer to dispatch table.
+  |   ld4u DISPATCH, DISPATCH
+  |    addi PC, zero, FRAME_CP
+  |  addiu DISPATCH, DISPATCH, GG_G2DISP
   |  bnez CRET1, <3			// Else continue with the call.
-  |.  addiu DISPATCH, DISPATCH, GG_G2DISP
   |  b ->vm_leave_cp			// No base? Just remove C frame.
   |.  nop
   |
