@@ -79,9 +79,9 @@ local function writeactions(out, name)
   if nn == 0 then nn = 1; actlist[0] = map_action.STOP end
   out:write("static const unsigned long ", name, "[", nn, "] = {\n")
   for i = 1,nn-1 do
-    assert(out:write("0x", string.format("%X", actlist[i]), "L,\n"))
+    assert(out:write("0x", string.format("%016X", actlist[i]), "L,\n"))
   end
-  assert(out:write("0x", string.format("%X", actlist[nn]), "L\n};\n\n"))
+  assert(out:write("0x", string.format("%016X", actlist[nn]), "L\n};\n\n"))
 end
 
 ------------------------------------------------------------------------------
@@ -234,9 +234,11 @@ end
 
 local map_op = {
   -- Arithmetic Instructions.
+  move_2 =		"283bf80051483000DA",
   add_3 =		"2806000051483000DAB",
   addi_3 =		"1808000051483000DAi",
   addli_3 =		"0000000051483000DAI",
+  addlo_2 =		"0000000051483000DO",
   shl16insli_3 =	"3800000051483000DAI",
   sub_3 =		"2868000051483000DAB",
 
@@ -308,6 +310,18 @@ local function parse_imm(imm, bits, shift, scale, signed)
   end
 end
 
+local function parse_rbo_x1_imm16(disp)
+  local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
+  if reg and tailr ~= "" then
+    local r, tp = parse_gpr(reg)
+    if tp then
+      waction("IMM", 2147483648 + 16 * 2097152, format(tp.ctypefmt, tailr))
+      return shll(r, 37)
+    end
+  end
+  werror("bad displacement `"..disp.."'")
+end
+
 local function parse_label(label, def)
   local prefix = sub(label, 1, 2)
   -- =>label (pc label reference)
@@ -361,6 +375,8 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + shll(parse_gpr(params[n]), 43); n = n + 1
     elseif p == "D" then
       op = op + shll(parse_gpr(params[n]), 31); n = n + 1
+    elseif p == "O" then
+      op = op + parse_rbo_x1_imm16(params[n]); n = n + 1
     elseif p == "E" then
       op = op + parse_gpr(params[n]); n = n + 1
     elseif p == "F" then
