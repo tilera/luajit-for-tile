@@ -242,7 +242,8 @@
 |
 |.macro ins_call
 |  // BASE = new base, RB = LFUNC/CFUNC, RC = nargs*8, PC = caller PC
-|  st4 PC, FRAME_PC(BASE)
+|  addi AT0, BASE, FRAME_PC
+|  st4 AT0, PC
 |  ins_callt
 |.endmacro
 |
@@ -368,31 +369,33 @@ static void build_subroutines(BuildCtx *ctx)
   |.  sw BASE, L->top			// Store new top.
   |
   |->vm_leave_cp:
-  |  lw TMP0, SAVE_CFRAME		// Restore previous C frame.
-  |   move CRET1, r0			// Ok return status for vm_pcall.
-  |  sw TMP0, L->cframe
+  |  addli AT0, sp, SAVE_CFRAME
+  |  ld TMP0, AT0		// Restore previous C frame.
+  |   move CRET1, zero		// Ok return status for vm_pcall.
+  |  addlo AT0, L:LREG->cframe
+  |  st AT0, TMP0
   |
   |->vm_leave_unw:
   |  restoreregs_ret
   |
   |6:
-  |  lw TMP1, L->maxstack
-  |  slt AT, TMP2, RD
-  |  bnez AT, >7			// Less results wanted?
+  |  addli AT0, L:LREG->maxstack
+  |  lw TMP1, AT0
+  |  cmplts AT1 TMP2, RD
   |  // More results wanted. Check stack size and fill up results with nil.
-  |.  slt AT, BASE, TMP1
-  |  beqz AT, >8
-  |.  nop
-  |  sw TISNIL, HI(BASE)
-  |  addiu RD, RD, 8
+  |  cmplts AT2, BASE, TMP1
+  |  bnez AT1, >7			// Less results wanted?
+  |  beqz AT2, >8
+  |  st BASE, TISNIL
+  |  addi RD, RD, 8
+  |  addi BASE, BASE, 8
   |  b <2
-  |.  addiu BASE, BASE, 8
   |
   |7:  // Less results wanted.
-  |  subu TMP0, RD, TMP2
-  |  subu TMP0, BASE, TMP0		// Either keep top or shrink it.
+  |  sub TMP0, RD, TMP2
+  |  sub TMP0, BASE, TMP0		// Either keep top or shrink it.
+  |  cmovnez BASE, TMP2, TMP0		// LUA_MULTRET+1 case?
   |  b <3
-  |.  movn BASE, TMP0, TMP2		// LUA_MULTRET+1 case?
   |
   |8:  // Corner case: need to grow stack for filling up results.
   |  // This can happen if:
@@ -552,10 +555,13 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vm_call_dispatch:
   |  // TMP2 = old base, BASE = new base, RC = nargs*8, PC = caller PC
-  |  lw TMP0, FRAME_PC(BASE)
-  |  li AT, LJ_TFUNC
-  |  bne TMP0, AT, ->vmeta_call
-  |.  lw LFUNC:RB, FRAME_FUNC(BASE)
+  |  addi TMP0, BASE, FRAME_PC
+  |  lw TMP0, TMP0
+  |  moveli AT0, LJ_TFUNC
+  |  cmpne AT1, TMP0, AT0
+  |  addi TMP0, BASE, FRAME_FUNC
+  |  lw LFUNC:RB, TMP0
+  |  bnez AT1, ->vmeta_call
   |
   |->vm_call_dispatch_f:
   |  ins_call
@@ -590,7 +596,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  addiu DISPATCH, DISPATCH, GG_G2DISP
   |  bnez CRET1, <3			// Else continue with the call.
   |  b ->vm_leave_cp			// No base? Just remove C frame.
-  |.  nop
   |
   |//-----------------------------------------------------------------------
   |//-- Metamethod handling ------------------------------------------------

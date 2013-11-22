@@ -256,10 +256,13 @@ local map_op = {
   shrsi_3 =		"3008000051483000DAi",
   bfextu_4 =		"286a300035000000EFGH",
   bfexts_4 =		"286a300034000000EFGH",
+  cmoveqz_3 =		"286A300050140000DAB",
+  cmovnez_3 =		"286A300050180000DAB",
 
   -- Memory Instructions.
   st_2 =		"DE064000340C3000ba",
   ld_2 =		"9E064000340C3000ba",
+  st4_2 =		"DE064000300C3000ba",
   ld4u_2 =		"9E064000300C3000ba",
 
   -- Control Instructions.
@@ -267,6 +270,11 @@ local map_op = {
   beqz_2 =		"1440000051483000AK",
   bnez_2 =		"17c0000051483000AK",
   b_1 = 		"1440000051483000K",
+
+  -- Compare Instructions.
+  cmpeq_3 =		"280a000051483000DAB",
+  cmpne_3 =		"2818000051483000DAB",
+  cmplts_3 =		"2814000051483000DAB",
 }
 
 ------------------------------------------------------------------------------
