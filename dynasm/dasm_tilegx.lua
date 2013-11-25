@@ -124,7 +124,7 @@ end
 
 -- Store word to reserved position.
 local function wputpos(pos, n)
-  assert(n >= 0 and n <= 0xffffffffffffffff and n % 1 == 0, "word out of range")
+  assert(n >= 0 and n <= 0xffffffffffffffff and n % 1 == 0, string.format("%016X", n).."word out of range")
   actlist[pos] = n
 end
 
@@ -245,7 +245,9 @@ local map_op = {
 
   -- Logical Instructions.
   and_3 =		"2808000051483000DAB",  
-  or_3 =		"283a000051483000DAB",  
+  or_3 =		"283A000051483000DAB",  
+  xor_3 =		"28D6000051483000DAB",  
+  xori_3 =		"1968000051483000DAi",  
   andi_3 =		"1818000051483000DAi",
   ori_3 =		"18c0000051483000DAi",
   shl_3 =		"284c000051483000DAB",
@@ -263,10 +265,18 @@ local map_op = {
   st_2 =		"DE064000340C3000ba",
   ld_2 =		"9E064000340C3000ba",
   st4_2 =		"DE064000300C3000ba",
+  st2_2 =		"DC064000340C3000ba",
+  st1_2 =		"DC064000300C3000ba",
   ld4u_2 =		"9E064000300C3000ba",
+  ld2u_2 =		"5E064000340C3000ba",
+  ld1u_2 =		"5C064000340C3000ba",
+  ld4s_2 =		"9C064000340C3000ba",
+  ld2s_2 =		"5E064000300C3000ba",
+  ld1s_2 =		"5C064000300C3000ba",
 
   -- Control Instructions.
   jr_1 =		"286A700051483000A",
+  jalr_1 =		"286A600051483000A",
   beqz_2 =		"1440000051483000AK",
   bnez_2 =		"17c0000051483000AK",
   b_1 = 		"1440000051483000K",
@@ -275,6 +285,9 @@ local map_op = {
   cmpeq_3 =		"280a000051483000DAB",
   cmpne_3 =		"2818000051483000DAB",
   cmplts_3 =		"2814000051483000DAB",
+  cmpltu_3 =		"2816000051483000DAB",
+  cmpltsi_3 =		"1828000051483000DAi",
+  cmpltui_3 =		"1830000051483000DAi",
 }
 
 ------------------------------------------------------------------------------
