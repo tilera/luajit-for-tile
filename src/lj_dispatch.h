@@ -12,7 +12,7 @@
 #include "lj_jit.h"
 #endif
 
-#if LJ_TARGET_MIPS
+#if defined(LJ_TARGET_MIPS) || defined(LJ_TARGET_TILEGX)
 /* Need our own global offset table for the dreaded MIPS calling conventions. */
 #if LJ_HASJIT
 #define JITGOTDEF(_)	_(lj_trace_exit) _(lj_trace_hot)

@@ -107,10 +107,10 @@ typedef union FPRArg {
 
 #elif LJ_TARGET_TILEGX
 
-#define CCALL_NARG_GPR		4
-#define CCALL_NARG_FPR		2
-#define CCALL_NRET_GPR		2
-#define CCALL_NRET_FPR		2
+#define CCALL_NARG_GPR		8
+#define CCALL_NARG_FPR		0
+#define CCALL_NRET_GPR		8
+#define CCALL_NRET_FPR		0
 #define CCALL_SPS_EXTRA		7
 #define CCALL_SPS_FREE		1
 
