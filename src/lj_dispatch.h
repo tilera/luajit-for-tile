@@ -70,7 +70,7 @@ typedef uint16_t HotCount;
 typedef struct GG_State {
   lua_State L;				/* Main thread. */
   global_State g;			/* Global state. */
-#if LJ_TARGET_MIPS
+#if defined(LJ_TARGET_MIPS) || defined(LJ_TARGET_TILEGX)
   ASMFunction got[LJ_GOT__MAX];		/* Global offset table. */
 #endif
 #if LJ_HASJIT

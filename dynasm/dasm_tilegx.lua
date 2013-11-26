@@ -39,7 +39,7 @@ local wline, werror, wfatal, wwarn
 local action_names = {
   "STOP", "SECTION", "ESC", "REL_EXT",
   "ALIGN", "REL_LG_X1_BR", "REL_LG_X1_J", "LABEL_LG",
-  "REL_PC", "LABEL_PC", "IMM",
+  "REL_PC_X1_BR", "REL_PC_X1_J", "LABEL_PC", "IMM",
 }
 
 -- Maximum number of section buffer positions for dasm_put().
@@ -79,9 +79,19 @@ local function writeactions(out, name)
   if nn == 0 then nn = 1; actlist[0] = map_action.STOP end
   out:write("static const unsigned long ", name, "[", nn, "] = {\n")
   for i = 1,nn-1 do
-    assert(out:write("0x", string.format("%016X", actlist[i]), "L,\n"))
+    if (sub(string.format("%016X", actlist[i]), 1, 8) == "00000000") then
+      -- bfextu, the opcode is out of double float representation range.
+      assert(out:write("0x286A3000", string.format("%08X", actlist[i]), "L,\n"))
+    else
+      assert(out:write("0x", string.format("%016X", actlist[i]), "L,\n"))
+    end
   end
-  assert(out:write("0x", string.format("%016X", actlist[nn]), "L\n};\n\n"))
+  if (sub(string.format("%016X", actlist[nn]), 1, 8) == "00000000") then
+    -- bfextu
+    assert(out:write("0x286A3000", string.format("%08X", actlist[nn]), "L,\n"))
+  else
+    assert(out:write("0x", string.format("%016X", actlist[nn]), "L\n};\n\n"))
+  end
 end
 
 ------------------------------------------------------------------------------
@@ -234,10 +244,10 @@ end
 
 local map_op = {
   -- Arithmetic Instructions.
-  move_2 =		"283bf80051483000DA",
+  move_2 =		"283BF80051483000DA",
   add_3 =		"2806000051483000DAB",
   addi_3 =		"1808000051483000DAi",
-  moveli_2 =		"000007e051483000DI",
+  moveli_2 =		"000007E051483000DI",
   addli_3 =		"0000000051483000DAI",
   addlo_2 =		"0000000051483000DO",
   shl16insli_3 =	"3800000051483000DAI",
@@ -246,18 +256,20 @@ local map_op = {
   -- Logical Instructions.
   and_3 =		"2808000051483000DAB",  
   or_3 =		"283A000051483000DAB",  
+  nor_3 =		"2838000051483000DAB",  
   xor_3 =		"28D6000051483000DAB",  
   xori_3 =		"1968000051483000DAi",  
   andi_3 =		"1818000051483000DAi",
-  ori_3 =		"18c0000051483000DAi",
-  shl_3 =		"284c000051483000DAB",
+  ori_3 =		"18C0000051483000DAi",
+  shl_3 =		"284C000051483000DAB",
   shli_3 =		"3004000051483000DAi",
   shru_3 =		"2852000051483000DAB",
-  shrui_3 =		"300a000051483000DAi",
-  shrs_3 =		"284e000051483000DAB",
+  shrui_3 =		"300A000051483000DAi",
+  shrs_3 =		"284E000051483000DAB",
   shrsi_3 =		"3008000051483000DAi",
-  bfextu_4 =		"286a300035000000EFGH",
-  bfexts_4 =		"286a300034000000EFGH",
+  -- bfextu_4 =		"286A300035000000EFGH",
+  bfextu_4 =		"0000000035000000EFGH",
+  bfexts_4 =		"0000000034000000EFGH",
   cmoveqz_3 =		"286A300050140000DAB",
   cmovnez_3 =		"286A300050180000DAB",
 
@@ -276,9 +288,15 @@ local map_op = {
 
   -- Control Instructions.
   jr_1 =		"286A700051483000A",
+  jal_1 =		"2000000051483000J",
+  j_1 =			"2400000051483000J",
   jalr_1 =		"286A600051483000A",
   beqz_2 =		"1440000051483000AK",
-  bnez_2 =		"17c0000051483000AK",
+  bnez_2 =		"17C0000051483000AK",
+  bltz_2 =		"1740000051483000AK",
+  blez_2 =		"16C0000051483000AK",
+  bgtz_2 =		"1540000051483000AK",
+  bgez_2 =		"14C0000051483000AK",
   b_1 = 		"1440000051483000K",
 
   -- Compare Instructions.

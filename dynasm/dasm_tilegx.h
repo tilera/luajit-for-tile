@@ -22,7 +22,7 @@ enum {
   /* The following actions need a buffer position. */
   DASM_ALIGN, DASM_REL_LG_X1_BR, DASM_REL_LG_X1_J, DASM_LABEL_LG,
   /* The following actions also have an argument. */
-  DASM_REL_PC, DASM_LABEL_PC, DASM_IMM,
+  DASM_REL_PC_X1_BR, DASM_REL_PC_X1_J, DASM_LABEL_PC, DASM_IMM,
   DASM__MAX
 };
 
@@ -192,7 +192,7 @@ void dasm_put(Dst_DECL, int start, ...)
     if (action >= DASM__MAX) {
       ofs += 8;
     } else {
-      int *pl, n = action >= DASM_REL_PC ? va_arg(ap, int) : 0;
+      int *pl, n = action >= DASM_REL_PC_X1_BR ? va_arg(ap, int) : 0;
       switch (action) {
       case DASM_STOP: goto stop;
       case DASM_SECTION:
@@ -209,7 +209,8 @@ void dasm_put(Dst_DECL, int start, ...)
 	pl += 10; n = *pl;
 	if (n < 0) n = 0;  /* Start new chain for fwd rel if label exists. */
 	goto linkrel;
-      case DASM_REL_PC:
+      case DASM_REL_PC_X1_BR:
+      case DASM_REL_PC_X1_J:
 	pl = D->pclabels + n; CKPL(pc, PC);
       putrel:
 	n = *pl;
@@ -291,7 +292,8 @@ int dasm_link(Dst_DECL, size_t *szp)
 	case DASM_ESC: p++; break;
 	case DASM_REL_EXT: break;
 	case DASM_ALIGN: ofs -= (b[pos++] + ofs) & (ins & 255); break;
-	case DASM_REL_LG_X1_BR: case DASM_REL_LG_X1_J: case DASM_REL_PC: pos++; break;
+	case DASM_REL_LG_X1_BR: case DASM_REL_LG_X1_J:
+	case DASM_REL_PC_X1_BR: case DASM_REL_PC_X1_J: pos++; break;
 	case DASM_LABEL_LG: case DASM_LABEL_PC: b[pos++] += ofs; break;
 	case DASM_IMM: pos++; break;
 	}
@@ -345,7 +347,8 @@ int dasm_encode(Dst_DECL, void *buffer)
 	case DASM_REL_LG_X1_BR:
 	case DASM_REL_LG_X1_J:
 	  CK(n >= 0, UNDEF_LG);
-	case DASM_REL_PC:
+	case DASM_REL_PC_X1_BR:
+	case DASM_REL_PC_X1_J:
 	  CK(n >= 0, UNDEF_PC);
 	  n = *DASM_POS2PTR(D, n);
 	  if (action == DASM_REL_LG_X1_BR || action == DASM_REL_LG_X1_J) {

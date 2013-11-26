@@ -7717,7 +7717,8 @@ int i;UB b=barg(L,1);for(i=lua_gettop(L);i>1;i--)b^=barg(L,i);BRET(b)}
 static int lshift(lua_State*L){
 UB b=barg(L,1),n=barg(L,2)&31;BRET(b<<n)}
 static long llshift(lua_State*L){
-ULB b=barg64(L,1),n=barg64(L,2)&63;BRET64(b<<n)}
+ULB b=barg64(L,1) & 0xFFFFFFFF,n=barg64(L,2)&63;
+BRET64(b<<n)}
 static int rshift(lua_State*L){
 UB b=barg(L,1),n=barg(L,2)&31;BRET(b>>n)}
 static int arshift(lua_State*L){
