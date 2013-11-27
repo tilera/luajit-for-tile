@@ -75,6 +75,7 @@
 |.define SAVE_L,	112
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by interpreter.
 |.define TILE_ABI_RESERV,	32	// .. 32+10*8: 64 bit GPR saves.
+|.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
 |
 |.define SAVE_MULTRES,	ARG5
@@ -156,8 +157,8 @@
 |//-----------------------------------------------------------------------
 |
 |// Endian-specific defines.
-|.define FRAME_PC,	LJ_ENDIAN_SELECT(-4,-8)
-|.define FRAME_FUNC,	LJ_ENDIAN_SELECT(-8,-4)
+|.define FRAME_PC,	-4
+|.define FRAME_FUNC,	-8
 |.define HI,		LJ_ENDIAN_SELECT(4,0)
 |.define LO,		LJ_ENDIAN_SELECT(0,4)
 |.define OFS_RD,	LJ_ENDIAN_SELECT(2,0)
@@ -298,7 +299,7 @@
 |
 |// Set current VM state. Uses TMP0.
 |.macro li_vmstate, st; moveli TMP0, ~LJ_VMST_..st; .endmacro
-|.macro st_vmstate; addli AT, DISPATCH, DISPATCH_GL(vmstate); st AT, TMP0; .endmacro
+|.macro st_vmstate; addli AT, DISPATCH, DISPATCH_GL(vmstate); st4 AT, TMP0; .endmacro
 |
 |// Move table write barrier back. Overwrites mark and tmp.
 |.macro barrierback, tab, mark, tmp, target
@@ -362,7 +363,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   addlo AT, L:LREG->base
   |   st AT, TMP2
   |    li_vmstate C
-  |   addi TMP2, sp, SAVE_NRES
+  |   addli TMP2, sp, SAVE_NRES
   |   ld TMP2, TMP2
   |   addli BASE, BASE, -8
   |    st_vmstate
@@ -378,10 +379,9 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |2:
   |  cmpne AT, TMP2, RD
+  |  addlo AT1, L:LREG->top
+  |  st AT1, BASE
   |  bnez AT, >6
-  |3:
-  |.  addlo AT, L:LREG->top
-  |.  st AT, BASE
   |
   |->vm_leave_cp:
   |  addli AT, sp, SAVE_CFRAME
@@ -395,7 +395,7 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |6:
   |  addlo TMP1, L:LREG->maxstack
-  |  ld TMP1, TMP1
+  |  ld4u TMP1, TMP1
   |  cmplts AT, TMP2, RD
   |  // More results wanted. Check stack size and fill up results with nil.
   |  cmplts AT1, BASE, TMP1
@@ -410,7 +410,9 @@ static void build_subroutines(BuildCtx *ctx)
   |  sub TMP0, RD, TMP2
   |  sub TMP0, BASE, TMP0		// Either keep top or shrink it.
   |  cmovnez BASE, TMP2, TMP0		// LUA_MULTRET+1 case?
-  |  b <3
+  |  addlo AT, L:LREG->top
+  |  st AT, BASE
+  |  b ->vm_leave_cp
   |
   |8:  // Corner case: need to grow stack for filling up results.
   |  // This can happen if:
@@ -422,7 +424,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CARG2, TMP2
   |  move CARG1, L
   |  call_intern lj_state_growstack	// (lua_State *L, int n)
-  |    addi TMP2, sp, SAVE_NRES
+  |    addli TMP2, sp, SAVE_NRES
   |    ld TMP2, TMP2
   |  addlo BASE, L:LREG->top			// Need the (realloced) L->top in BASE.
   |  ld BASE, BASE
@@ -523,9 +525,9 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi PC, zero, FRAME_CP
   |  addli TMP0, sp, CFRAME_RESUME
   |    addli DISPATCH, DISPATCH, GG_G2DISP
-  |   addi AT, sp, SAVE_NRES
+  |   addli AT, sp, SAVE_NRES
   |   st AT, zero
-  |   addi AT, sp, SAVE_ERRF
+  |   addli AT, sp, SAVE_ERRF
   |   st AT, zero
   |  addlo AT, L:LREG->cframe
   |  st AT, TMP0
@@ -561,7 +563,7 @@ static void build_subroutines(BuildCtx *ctx)
   |->vm_pcall:				// Setup protected C frame and enter VM.
   |  // (lua_State *L, TValue *base, int nres1, ptrdiff_t ef)
   |  saveregs
-  |  addi AT, sp, SAVE_ERRF
+  |  addli AT, sp, SAVE_ERRF
   |  st AT, CARG4
   |  addi PC, zero, FRAME_CP
   |  b >1
@@ -574,7 +576,7 @@ static void build_subroutines(BuildCtx *ctx)
   |1:  // Entry point for vm_pcall above (PC = ftype).
   |  addlo TMP1, L:CARG1->cframe
   |  ld TMP1, TMP1
-  |   addi AT, sp, SAVE_NRES
+  |   addli AT, sp, SAVE_NRES
   |   st AT, CARG3
   |    move L, CARG1
   |   addi AT, sp, SAVE_L
@@ -584,7 +586,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  st AT, sp
   |    addlo DISPATCH, L:LREG->glref		// Setup pointer to dispatch table.
   |    ld DISPATCH, DISPATCH
-  |   st sp, CARG1
+  |   addi AT, sp, SAVE_PC
+  |   st AT, CARG1
   |  addi AT, sp, SAVE_CFRAME
   |  st AT, TMP1
   |    addli DISPATCH, DISPATCH, GG_G2DISP
@@ -604,11 +607,11 @@ static void build_subroutines(BuildCtx *ctx)
   |->vm_call_dispatch:
   |  // TMP2 = old base, BASE = new base, RC = nargs*8, PC = caller PC
   |  addi TMP0, BASE, FRAME_PC
-  |  ld TMP0, TMP0
+  |  ld4s TMP0, TMP0
   |  moveli AT, LJ_TFUNC
   |  cmpne AT1, TMP0, AT
   |  addi TMP0, BASE, FRAME_FUNC
-  |  ld LFUNC:RB, TMP0
+  |  ld4u LFUNC:RB, TMP0
   |  bnez AT1, ->vmeta_call
   |
   |->vm_call_dispatch_f:
@@ -630,9 +633,9 @@ static void build_subroutines(BuildCtx *ctx)
   |   addlo AT, L:CARG1->cframe
   |    ld TMP1, AT
   |    st AT, sp			// Add our C frame to cframe chain.
-  |   addi AT, sp, SAVE_NRES		// Neg. delta means cframe w/o frame.
+  |   addli AT, sp, SAVE_NRES		// Neg. delta means cframe w/o frame.
   |    st AT, TMP0
-  |  addi AT, sp, SAVE_ERRF		// No error function.
+  |  addli AT, sp, SAVE_ERRF		// No error function.
   |   st AT, r0
   |  addi AT, sp, SAVE_CFRAME
   |  st AT, TMP1
@@ -4658,13 +4661,13 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     }
     |  add TMP1, RA, NARGS8:RC
     |  addlo TMP2, L->maxstack
-    |  ld TMP2, TMP2
+    |  ld4u TMP2, TMP2
     |   add RC, BASE, NARGS8:RC
     |  addlo AT, L->base
     |  st AT, BASE
     |  cmpltu AT, TMP2, TMP1
-    |   addlo AT, L->top
-    |   st AT, RC
+    |   addlo AT1, L->top
+    |   st AT1, RC
     |    li_vmstate C
     if (op == BC_FUNCCW) {
       |  addlo CARG2, CFUNC:RB->f
@@ -4682,7 +4685,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld TMP1, TMP1
     |    li_vmstate INTERP
     |  addi PC, BASE, FRAME_PC
-    |  ld PC, PC
+    |  ld4s PC, PC
     |   sub RA, TMP1, RD		// RA = L->top - nresults*8
     |   st_vmstate
     |  b ->vm_returnc

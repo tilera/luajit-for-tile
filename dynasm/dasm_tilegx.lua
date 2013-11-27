@@ -80,14 +80,14 @@ local function writeactions(out, name)
   out:write("static const unsigned long ", name, "[", nn, "] = {\n")
   for i = 1,nn-1 do
     if (sub(string.format("%016X", actlist[i]), 1, 8) == "00000000") then
-      -- bfextu, the opcode is out of double float representation range.
+      -- X0 bundle.
       assert(out:write("0x286A3000", string.format("%08X", actlist[i]), "L,\n"))
     else
       assert(out:write("0x", string.format("%016X", actlist[i]), "L,\n"))
     end
   end
   if (sub(string.format("%016X", actlist[nn]), 1, 8) == "00000000") then
-    -- bfextu
+    -- X0 bundle.
     assert(out:write("0x286A3000", string.format("%08X", actlist[nn]), "L,\n"))
   else
     assert(out:write("0x", string.format("%016X", actlist[nn]), "L\n};\n\n"))
@@ -270,8 +270,8 @@ local map_op = {
   -- bfextu_4 =		"286A300035000000EFGH",
   bfextu_4 =		"0000000035000000EFGH",
   bfexts_4 =		"0000000034000000EFGH",
-  cmoveqz_3 =		"286A300050140000DAB",
-  cmovnez_3 =		"286A300050180000DAB",
+  cmoveqz_3 =		"0000000050140000EFC",
+  cmovnez_3 =		"0000000050180000EFC",
 
   -- Memory Instructions.
   st_2 =		"DE064000340C3000ab",
@@ -297,7 +297,7 @@ local map_op = {
   blez_2 =		"16C0000051483000AK",
   bgtz_2 =		"1540000051483000AK",
   bgez_2 =		"14C0000051483000AK",
-  b_1 = 		"1440000051483000K",
+  b_1 = 		"144007e051483000K",
 
   -- Compare Instructions.
   cmpeq_3 =		"280a000051483000DAB",
@@ -414,6 +414,8 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + shll(parse_gpr(params[n]), 37); n = n + 1
     elseif p == "B" then
       op = op + shll(parse_gpr(params[n]), 43); n = n + 1
+    elseif p == "C" then
+      op = op + shll(parse_gpr(params[n]), 12); n = n + 1
     elseif p == "D" then
       op = op + shll(parse_gpr(params[n]), 31); n = n + 1
     elseif p == "O" then

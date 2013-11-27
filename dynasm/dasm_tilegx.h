@@ -351,13 +351,9 @@ int dasm_encode(Dst_DECL, void *buffer)
 	case DASM_REL_PC_X1_J:
 	  CK(n >= 0, UNDEF_PC);
 	  n = *DASM_POS2PTR(D, n);
-	  if (action == DASM_REL_LG_X1_BR || action == DASM_REL_LG_X1_J) {
-	    n = n - (long)((char *)cp - base);
-	    if (n >= 0)
-		    n = n + 8;
-	    else
-		    n = n - 8;
-	  } else
+	  if (action == DASM_REL_LG_X1_BR || action == DASM_REL_LG_X1_J)
+	    n = n - (long)((char *)cp - base) + 8;
+	  else
 	    n = (n + (long)base) & 0x0fffffff;
 	patchrel:
 	  //FIXME: enable this sanity check later.
