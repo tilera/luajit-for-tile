@@ -94,7 +94,7 @@ static void emit_asm_dwords(BuildCtx *ctx, uint8_t *p, int n)
   int i;
   for (i = 0; i < n; i += 8) {
     if ((i & 31) == 0)
-      fprintf(ctx->fp, "\t.long 0x%016lx", *(uint64_t *)(p+i));
+      fprintf(ctx->fp, "\t.quad 0x%016lx", *(uint64_t *)(p+i));
     else
       fprintf(ctx->fp, ",0x%016lx", *(uint64_t *)(p+i));
     if ((i & 31) == 24) putc('\n', ctx->fp);
