@@ -88,6 +88,20 @@ static void emit_asm_words(BuildCtx *ctx, uint8_t *p, int n)
   if ((n & 15) != 0) putc('\n', ctx->fp);
 }
 
+/* Emit words piecewise as assembler text. */
+static void emit_asm_dwords(BuildCtx *ctx, uint8_t *p, int n)
+{
+  int i;
+  for (i = 0; i < n; i += 8) {
+    if ((i & 31) == 0)
+      fprintf(ctx->fp, "\t.long 0x%016lx", *(uint64_t *)(p+i));
+    else
+      fprintf(ctx->fp, ",0x%016lx", *(uint64_t *)(p+i));
+    if ((i & 31) == 24) putc('\n', ctx->fp);
+  }
+  if ((n & 31) != 0) putc('\n', ctx->fp);
+}
+
 /* Emit relocation as part of an instruction. */
 static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
 			       const char *sym)
@@ -124,7 +138,7 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
 	    ins, sym);
     exit(1);
   }
-#elif LJ_TARGET_MIPS
+#elif LJ_TARGET_MIPS || LJ_TARGET_TILEGX
   fprintf(stderr,
 	  "Error: unsupported opcode %08x for %s symbol relocation.\n",
 	  ins, sym);
@@ -269,6 +283,8 @@ void emit_asm(BuildCtx *ctx)
     }
 #if LJ_TARGET_X86ORX64
     emit_asm_bytes(ctx, ctx->code+ofs, next-ofs);
+#elif LJ_TARGET_TILEGX
+    emit_asm_dwords(ctx, ctx->code+ofs, next-ofs);
 #else
     emit_asm_words(ctx, ctx->code+ofs, next-ofs);
 #endif

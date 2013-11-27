@@ -618,6 +618,8 @@ static uint32_t jit_cpudetect(lua_State *L)
   }
 #endif
 #endif
+#elif LJ_TARGET_TILEGX
+  /* Nothing to do. */
 #else
 #error "Missing CPU detection for this architecture"
 #endif

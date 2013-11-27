@@ -47,7 +47,7 @@
 /* Names for the CPU-specific flags. Must match the order above. */
 #define JIT_F_CPU_FIRST		JIT_F_SQRT
 #define JIT_F_CPUSTRING		"\4SQRT\5ROUND"
-#elif LJ_TARGET_MIPS
+#elif LJ_TARGET_MIPS || LJ_TARGET_TILEGX
 #define JIT_F_MIPS32R2		0x00000010
 
 /* Names for the CPU-specific flags. Must match the order above. */

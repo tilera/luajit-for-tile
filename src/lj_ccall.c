@@ -428,6 +428,51 @@
   if (ctype_isfp(ctr->info) && ctr->size == sizeof(float)) \
     sp = (uint8_t *)&cc->fpr[0].f;
 
+#elif LJ_TARGET_TILEGX
+/* -- TILEGX calling conventions -------------------------------------------- */
+
+#define CCALL_HANDLE_STRUCTRET \
+  /* Return structs of size <= 4 in a GPR. */ \
+  cc->retref = !(sz <= 4); \
+  if (cc->retref) cc->gpr[ngpr++] = (GPRArg)dp;
+
+#define CCALL_HANDLE_COMPLEXRET \
+  cc->retref = 1;  /* Return all complex values by reference. */ \
+  cc->gpr[ngpr++] = (GPRArg)dp;
+
+#define CCALL_HANDLE_COMPLEXRET2 \
+  UNUSED(dp); /* Nothing to do. */
+
+#define CCALL_HANDLE_STRUCTARG \
+  /* Pass all structs by value in registers and/or on the stack. */
+
+#define CCALL_HANDLE_COMPLEXARG \
+  /* Pass complex by value in 2 or 4 GPRs. */
+
+#define CCALL_HANDLE_REGARG_FP1
+#define CCALL_HANDLE_REGARG_FP2
+
+#define CCALL_HANDLE_REGARG \
+  CCALL_HANDLE_REGARG_FP1 \
+  if ((d->info & CTF_ALIGN) > CTALIGN_PTR) { \
+    if (ngpr < maxgpr) \
+      ngpr = (ngpr + 1u) & ~1u;  /* Align to regpair. */ \
+  } \
+  if (ngpr < maxgpr) { \
+    dp = &cc->gpr[ngpr]; \
+    if (ngpr + n > maxgpr) { \
+      nsp += ngpr + n - maxgpr;  /* Assumes contiguous gpr/stack fields. */ \
+      if (nsp > CCALL_MAXSTACK) goto err_nyi;  /* Too many arguments. */ \
+      ngpr = maxgpr; \
+    } else { \
+      ngpr += n; \
+    } \
+    goto done; \
+  } CCALL_HANDLE_REGARG_FP2
+
+#define CCALL_HANDLE_RET \
+  if ((ct->info & CTF_VARARG)) sp = (uint8_t *)&cc->gpr[0];
+
 #else
 #error "Missing calling convention definitions for this architecture"
 #endif
