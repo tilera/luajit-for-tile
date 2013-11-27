@@ -60,28 +60,23 @@
 |.define CARG3,		r2
 |.define CARG4,		r3
 |.define CARG5,		r4
-|.define ARG5,		r4
+|.define ARG5,		r4 // alias for CARG5
 |
 |// TileGX ABI use r0 ~ r9 as both arg passing and value returning.
 |.define CRET1,		r0
 |.define CRET2,		r1
 |
 |// Stack layout while in interpreter. Must match with lj_frame.h.
-|.define CFRAME_SPACE,	96	// Delta for sp.
+|.define CFRAME_SPACE,	112	// Delta for sp.
 |
-|.define SAVE_ERRF,	120	// 64 bit C frame info.
-|.define SAVE_NRES,	112
-|.define SAVE_CFRAME,	104
-|.define SAVE_L,	96
-|//----- 8 byte aligned, ^^^^ 16 byte register save area, owned by interpreter.
-|.define TILE_ABI_RESERV,	16	// .. 16+10*8: 64 bit GPR saves.
-|.define SAVE_OSP,	8
-|// FIXME, SAVE_PC is supposed to be updated by callee, but we actually 
-|// update it in our hand-written assembly caller.
-|.define SAVE_PC,	0
-|//----- 8 byte aligned, ^^^^ 16 byte register save area, owned by callee.
+|.define SAVE_ERRF,	136	// 64 bit C frame info.
+|.define SAVE_NRES,	128
+|.define SAVE_CFRAME,	120
+|.define SAVE_L,	112
+|//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by interpreter.
+|.define TILE_ABI_RESERV,	32	// .. 32+10*8: 64 bit GPR saves.
+|//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
 |
-|.define ARG5_OFS,	16
 |.define SAVE_MULTRES,	ARG5
 |
 |.macro saveregs
@@ -1849,7 +1844,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi CARG3, zero, 1
   |  beqz AT, ->fff_fallback
   |   //cvt.w.d FARG1, FARG1
-  |  addli CARG2, sp, ARG5_OFS
   |  addli AT, zero, 256
   |  cmpltu AT, TMP0, AT
   |   //mfc1 TMP0, FARG1
