@@ -159,8 +159,8 @@
 |// Endian-specific defines.
 |.define FRAME_PC,	-4
 |.define FRAME_FUNC,	-8
-|.define HI,		LJ_ENDIAN_SELECT(4,0)
-|.define LO,		LJ_ENDIAN_SELECT(0,4)
+|.define HI,		4
+|.define LO,		0
 |.define OFS_RD,	LJ_ENDIAN_SELECT(2,0)
 |.define OFS_RA,	LJ_ENDIAN_SELECT(1,2)
 |.define OFS_OP,	LJ_ENDIAN_SELECT(0,3)
@@ -992,7 +992,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CARG1, L
   |  call_intern lj_meta_call	// (lua_State *L, TValue *func, TValue *top)
   |  addi TMP1, BASE, FRAME_PC
-  |  ld TMP1, TMP1
+  |  ld4s TMP1, TMP1
   |   addi LFUNC:RB, RA, FRAME_FUNC
   |   ld LFUNC:RB, LFUNC:RB
   |  addli NARGS8:RC, MULTRES, 8	// Got one more argument now.
@@ -1101,7 +1101,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  addli RA, BASE, -8
   |  beqz AT, ->fff_fallback
   |  addi PC, BASE, FRAME_PC
-  |  ld PC, PC
+  |  ld4s PC, PC
   |  addli RD, NARGS8:RC, 8		// Compute (nresults+1)*8.
   |  add TMP2, RA, NARGS8:RC
   |   addi AT, RA, HI
@@ -1288,7 +1288,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   addi AT1, TMP2, HI
   |   st AT1, TISNIL
   |  addi AT1, BASE, FRAME_PC
-  |  ld PC, AT1
+  |  ld4s PC, AT1
   |  cmpne AT1, CARG1, AT
   |  bnez AT1, ->fff_fallback
   |  load_got lj_tab_next
@@ -1316,8 +1316,8 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc_1 pairs
   |  addi AT, zero, LJ_TTAB
-  |  addi AT1, BASE, FRAME_PC
-  |  ld PC, AT1
+  |  addi PC, BASE, FRAME_PC
+  |  ld4s PC, PC
   |  cmpne AT1, CARG3, AT
   |  bnez AT1, ->fff_fallback
   |  addli RA, BASE, -8
@@ -1352,8 +1352,8 @@ static void build_subroutines(BuildCtx *ctx)
   |   addi TMP0, zero, 1
   |  cmovnez AT, CARG3, zero
   |   //mtc1 TMP0, FARG1
-  |  addi AT1, BASE, FRAME_PC
-  |  ld PC, AT1
+  |  addi PC, BASE, FRAME_PC
+  |  ld4s PC, PC
   |  beqz AT, ->fff_fallback
   |   //cvt.w.d FRET1, FARG2
   |  //cvt.d.w FARG1, FARG1
@@ -1399,7 +1399,7 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_1 ipairs
   |  addi AT, zero, LJ_TTAB
   |  addi AT1, BASE, FRAME_PC
-  |  ld PC, AT1
+  |  ld4s PC, AT1
   |  cmpne AT1, CARG3, AT
   |  bnez AT1, ->fff_fallback
   |  addli RA, BASE, -8
@@ -1488,7 +1488,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  addlo TMP0, L:CARG1->maxstack
   |  ld TMP0, TMP0
   |  addi AT1, BASE, FRAME_PC
-  |  ld PC, AT1
+  |  ld4s PC, AT1
   |  beqz AT, ->fff_fallback		// base == top && st == 0?
   |  add TMP2, CARG2, NARGS8:RC
   |  cmpltu AT, TMP0, TMP2
@@ -3585,21 +3585,21 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add NODE:TMP2, NODE:TMP2, TMP1	// node = tab->node + (idx*32-idx*8)
     |1:
     |  addi CARG1, NODE:TMP2, offsetof(Node, key)+HI
-    |  ld4u CARG1, CARG1
+    |  ld4s CARG1, CARG1
     |   addi TMP0, NODE:TMP2, offsetof(Node, key)+LO
     |   ld4u TMP0, TMP0
     |    addlo NODE:TMP1, NODE:TMP2->next
     |    ld4u NODE:TMP1, NODE:TMP1
     |    addi CARG2, NODE:TMP2, offsetof(Node, val)+HI
-    |    ld4u CARG2, CARG2
-    |  addli CARG1, CARG1, -LJ_TSTR
+    |    ld4s CARG2, CARG2
+    |  addli CARG1, CARG1, 5
     |   xor TMP0, TMP0, STR:RC
     |  or AT, CARG1, TMP0
-    |  addlo AT, TAB:RB->metatable
-    |  ld4u TAB:TMP3, AT
+    |  addlo TAB:TMP3, TAB:RB->metatable
+    |  ld4u TAB:TMP3, TAB:TMP3
     |  bnez AT, >4
-    |    addi AT, NODE:TMP2, offsetof(Node, val)+LO
-    |    ld4u CARG1, AT
+    |    addi CARG1, NODE:TMP2, offsetof(Node, val)+LO
+    |    ld4u CARG1, CARG1
     |    cmpeq AT, CARG2, TISNIL
     |    bnez AT, >5		// Key found, but nil value?
     |3:
@@ -3618,8 +3618,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |5:  // Check for __index if table value is nil.
     |  addi CARG2, zero, LJ_TNIL
     |  beqz TAB:TMP3, <3		// No metatable: done.
-    |  addlo AT, TAB:TMP3->nomm
-    |  ld1u TMP0, AT
+    |  addlo TMP0, TAB:TMP3->nomm
+    |  ld1u TMP0, TMP0
     |  andi TMP0, TMP0, 1<<MM_index
     |  bnez TMP0, <3			// 'no __index' flag set: done.
     |  b ->vmeta_tgets
@@ -3982,7 +3982,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add RA, BASE, RA
     |   addi AT, zero, LJ_TFUNC
     |  addi TMP0, RA, HI
-    |  ld TMP0, TMP0
+    |  ld4s TMP0, TMP0
     |   addi LFUNC:RB, RA, LO
     |   ld LFUNC:RB, LFUNC:RB
     |   move NARGS8:RC, RD
@@ -4150,11 +4150,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addi CFUNC:TMP1, RA, -24+LO
     |  ld CFUNC:TMP1, CFUNC:TMP1
     |   addi TMP2, RA, -16+HI
-    |   ld TMP2, TMP2
+    |   ld4s TMP2, TMP2
     |    addi TMP3, RA, -8+HI
     |    ld TMP3, TMP3
     |  addi AT, zero, LJ_TFUNC
-    |  addli TMP2, TMP2, -LJ_TTAB
+    |  addli TMP2, TMP2, 12 //-LJ_TTAB
     |  cmpne AT, TMP0, AT
     |  bnez AT, >5
     |  addlo TMP1, CFUNC:TMP1->ffid
@@ -4273,20 +4273,20 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_RET:
     |  // RA = results*8, RD = (nresults+1)*8
     |  addi PC, BASE, FRAME_PC
-    |  ld PC, PC
+    |  ld4s PC, PC
     |   add RA, BASE, RA
     |    move MULTRES, RD
     |1:
     |  andi TMP0, PC, FRAME_TYPE
+    |  xori TMP1, PC, FRAME_VARG
     |  bnez TMP0, ->BC_RETV_Z
-    |.  xori TMP1, PC, FRAME_VARG
     |
     |->BC_RET_Z:
     |  // BASE = base, RA = resultptr, RD = (nresults+1)*8, PC = return
     |   addi INS, PC, -4
     |   ld4u INS, INS
-    |    addli TMP2, BASE, -8
-    |    addli RC, RD, -8
+    |    addi TMP2, BASE, -8
+    |    addi RC, RD, -8
     |  decode_RA8a TMP0, INS
     |   decode_RB8a RB, INS
     |  decode_RA8b TMP0
@@ -4295,29 +4295,29 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  sub BASE, TMP2, TMP0
     |  beqz RC, >3
     |2:
-    |   //ldc1 f0, 0(RA)
+    |   ld AT, RA
     |    addli RA, RA, 8
     |  addli RC, RC, -8
-    |   //sdc1 f0, 0(TMP2)
+    |   st TMP2, AT
     |  addli TMP2, TMP2, 8
     |  bnez RC, <2
     |3:
     |  addli TMP3, TMP3, -8
     |5:
     |  cmpltu AT, TMP2, TMP3
-    |  addi AT, BASE, FRAME_FUNC
-    |  ld LFUNC:TMP1, AT
+    |  addi LFUNC:TMP1, BASE, FRAME_FUNC
+    |  ld4u LFUNC:TMP1, LFUNC:TMP1
     |  bnez AT, >6
     |  ins_next1
     |  addlo TMP1, LFUNC:TMP1->pc
-    |  ld TMP1, TMP1
+    |  ld4u TMP1, TMP1
     |  addi KBASE, TMP1, PC2PROTO(k)
     |  ld4u KBASE, KBASE
     |  ins_next2
     |
     |6:  // Fill up results with nil.
     |  addi AT, TMP2, HI
-    |  st AT, TISNIL
+    |  st4 AT, TISNIL
     |  addli TMP2, TMP2, 8
     |  b <5
     |
@@ -4326,15 +4326,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  bnez TMP2, ->vm_return
     |  // Return from vararg function: relocate BASE down.
     |  sub BASE, BASE, TMP1
-    |  addi AT, BASE, FRAME_PC
-    |  ld PC, AT
+    |  addi PC, BASE, FRAME_PC
+    |  ld4s PC, PC
     |  b <1
     break;
 
   case BC_RET0: case BC_RET1:
     |  // RA = results*8, RD = (nresults+1)*8
     |  addi PC, BASE, FRAME_PC
-    |  ld PC, PC
+    |  ld4s PC, PC
     |   add RA, BASE, RA
     |    move MULTRES, RD
     |  andi TMP0, PC, FRAME_TYPE
@@ -4345,25 +4345,24 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4u INS, INS
     |   addli TMP2, BASE, -8
     if (op == BC_RET1) {
-      |  //ldc1 f0, 0(RA)
+      |  ld AT2, RA
     }
     |  decode_RB8a RB, INS
     |   decode_RA8a RA, INS
     |  decode_RB8b RB
     |   decode_RA8b RA
     if (op == BC_RET1) {
-      |  //sdc1 f0, 0(TMP2)
+      |  st TMP2, AT2
     }
     |   sub BASE, TMP2, RA
     |5:
     |  cmpltu AT, RD, RB
-    |  addi AT, BASE, FRAME_FUNC
-    |  ld LFUNC:TMP1, AT
-    |  ld LFUNC:TMP1, AT
+    |  addi LFUNC:TMP1, BASE, FRAME_FUNC
+    |  ld4u LFUNC:TMP1, LFUNC:TMP1
     |  bnez AT, >6
     |  ins_next1
     |  addlo TMP1, LFUNC:TMP1->pc
-    |  ld TMP1, TMP1
+    |  ld4u TMP1, TMP1
     |  addi KBASE, TMP1, PC2PROTO(k)
     |  ld4u KBASE, KBASE
     |  ins_next2
@@ -4373,10 +4372,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addli RD, RD, 8
     if (op == BC_RET1) {
       |  addi AT, TMP2, HI
-      |  st AT, TISNIL
+      |  st4 AT, TISNIL
     } else {
       |  addi AT, TMP2, -8+HI
-      |  st AT, TISNIL
+      |  st4 AT, TISNIL
     }
     |  b <5
     break;
