@@ -680,7 +680,7 @@ static void build_subroutines(BuildCtx *ctx)
   |.endif
   |  // BASE = base, RA = resultptr, RB = meta base
   |  addi AT, TMP1, PC2PROTO(k)
-  |  ld KBASE, AT
+  |  ld4u KBASE, AT
   |  jr TMP0				// Jump to continuation.
   |
   |.if FFI
@@ -2438,7 +2438,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   addi AT, DISPATCH, DISPATCH_GL(jit_L)
   |   st AT, zero
   |  addi KBASE, TMP1, PC2PROTO(k)
-  |  ld KBASE, KBASE
+  |  ld4u KBASE, KBASE
   |    //cvt.d.s TOBIT, TOBIT
   |  // Modified copy of ins_next which handles function header dispatch, too.
   |  ld INS, PC
@@ -3474,13 +3474,13 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_GSET:
     |  // RA = src*8, RD = str_const*8 (~)
     |  addi LFUNC:TMP2, BASE, FRAME_FUNC
-    |  ld LFUNC:TMP2, LFUNC:TMP2
+    |  ld4u LFUNC:TMP2, LFUNC:TMP2
     |   shrui TMP1, RD, 1
     |   sub TMP1, KBASE, TMP1
     |  addlo TAB:RB, LFUNC:TMP2->env
-    |  ld TAB:RB, TAB:RB
+    |  ld4u TAB:RB, TAB:RB
     |  addi STR:RC, TMP1, -4
-    |  ld STR:RC, STR:RC
+    |  ld4u STR:RC, STR:RC
     |  add RA, BASE, RA
     if (op == BC_GGET) {
       |  b ->BC_TGETS_Z
@@ -4029,7 +4029,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addlo TMP1, LFUNC:TMP1->pc
     |  ld TMP1, TMP1
     |  addi AT, TMP1, PC2PROTO(k)
-    |  ld KBASE, AT
+    |  ld4u KBASE, AT
     |  b <4
     |
     |7:  // Tailcall from a vararg function.
@@ -4312,7 +4312,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addlo TMP1, LFUNC:TMP1->pc
     |  ld TMP1, TMP1
     |  addi KBASE, TMP1, PC2PROTO(k)
-    |  ld KBASE, KBASE
+    |  ld4u KBASE, KBASE
     |  ins_next2
     |
     |6:  // Fill up results with nil.
@@ -4365,7 +4365,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addlo TMP1, LFUNC:TMP1->pc
     |  ld TMP1, TMP1
     |  addi KBASE, TMP1, PC2PROTO(k)
-    |  ld KBASE, KBASE
+    |  ld4u KBASE, KBASE
     |  ins_next2
     |
     |6:  // Fill up results with nil.
@@ -4571,7 +4571,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   addi TMP1, PC, -4+PC2PROTO(numparams)
     |   ld1u TMP1, TMP1
     |    addi KBASE, PC, -4+PC2PROTO(k)
-    |    ld KBASE, KBASE
+    |    ld4u KBASE, KBASE
     |  cmpltu AT, TMP2, RA
     |  shli TMP1, TMP1, 3
     |  bnez AT, ->vm_growstack_l
@@ -4608,14 +4608,14 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  // BASE = new base, RA = BASE+framesize*8, RB = LFUNC, RC = nargs*8
     |   add TMP1, BASE, RC
     |  addlo TMP2, L->maxstack
-    |  ld TMP2, TMP2
+    |  ld4u TMP2, TMP2
     |  add TMP0, RA, RC
     |   addi AT, TMP1, LO
     |   st AT, LFUNC:RB
     |   addli TMP3, RC, 8+FRAME_VARG
     |  cmpltu AT, TMP0, TMP2
     |    addi KBASE, PC, -4+PC2PROTO(k)
-    |    ld KBASE, KBASE
+    |    ld4u KBASE, KBASE
     |  addi AT, TMP1, HI
     |  st AT, TMP3
     |  beqz AT, ->vm_growstack_l
