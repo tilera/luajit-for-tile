@@ -33,7 +33,7 @@ LJ_STATIC_ASSERT(GG_NUM_ASMFF == FF_NUM_ASMFUNC);
 
 /* -- Dispatch table management ------------------------------------------- */
 
-#if LJ_TARGET_MIPS
+#if LJ_TARGET_MIPS || LJ_TARGET_TILEGX
 #include <math.h>
 LJ_FUNCA_NORET void LJ_FASTCALL lj_ffh_coroutine_wrap_err(lua_State *L,
 							  lua_State *co);
@@ -63,8 +63,8 @@ void lj_dispatch_init(GG_State *GG)
   GG->g.bc_cfunc_ext = GG->g.bc_cfunc_int = BCINS_AD(BC_FUNCC, LUA_MINSTACK, 0);
   for (i = 0; i < GG_NUM_ASMFF; i++)
     GG->bcff[i] = BCINS_AD(BC__MAX+i, 0, 0);
-#if LJ_TARGET_MIPS
-  memcpy(GG->got, dispatch_got, LJ_GOT__MAX*4);
+#if LJ_TARGET_MIPS || LJ_TARGET_TILEGX
+  memcpy(GG->got, dispatch_got, LJ_GOT__MAX*8);
 #endif
 }
 
