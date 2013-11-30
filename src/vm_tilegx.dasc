@@ -2910,15 +2910,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpeq AT, TMP0, AT
     |  bnez AT, ->vmeta_equal_cd
     |.endif
-    |.  xor TMP0, TMP0, TMP1
+    |  xor TMP0, TMP0, TMP1
     |  decode_RD4b TMP2
     |  moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
     |  shl16insli TMP3, TMP3, 0
     |  add TMP2, TMP2, TMP3
     if (vk) {
-      |  cmovnez TMP2, TMP0, zero
+      |  cmovnez, TMP2, TMP0, zero
     } else {
-      |  cmoveqz, r0, TMP0, zero
+      |  cmoveqz, TMP2, TMP0, zero
     }
     |  add PC, PC, TMP2
     |  ins_next
