@@ -254,7 +254,8 @@
 |
 |.macro branch_RD
 |  shrui TMP0, RD, 1
-|  //lui AT, (-(BCBIAS_J*4 >> 16) & 65535)
+|  moveli AT, (-(BCBIAS_J*4 >> 16) & 65535)
+|  shl16insli AT, AT, 0
 |  add TMP0, TMP0, AT
 |  add PC, PC, TMP0
 |.endmacro
@@ -2706,31 +2707,32 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s TMP0, TMP0
     |   addi TMP1, CARG3, HI
     |   ld4s TMP1, TMP1
-    |   //ldc1 f0, 0(CARG2)
-    |   //ldc1 f2, 0(CARG3)
-    |  cmpltui TMP0, TMP0, LJ_TISNUM
-    |   cmpltui TMP1, TMP1, LJ_TISNUM
+    |   ld AT2, CARG2
+    |   ld AT3, CARG3
+    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |  cmpltu TMP0, TMP0, AT
+    |   cmpltu TMP1, TMP1, AT
     |    addi TMP2, PC, OFS_RD
     |    ld2u TMP2, TMP2
     |  and TMP0, TMP0, TMP1
-    |    addli PC, PC, 4
-    |   //lui TMP1, (-(BCBIAS_J*4 >> 16) & 65535)
+    |    addi PC, PC, 4
+    |   moveli TMP1, (-(BCBIAS_J*4 >> 16) & 65535)
+    |   shl16insli TMP1, TMP1, 0
     |  beqz TMP0, ->vmeta_comp
     |    decode_RD4b TMP2
     |    add TMP2, TMP2, TMP1
-//FIXME
-#if 0
+    |  fdouble_add_flags AT, AT2, AT3
     if (op == BC_ISLT || op == BC_ISGE) {
-      |  //c.olt.d f0, f2
+      |  bfextu AT, AT, 26, 26
     } else {
-      |  //c.ole.d f0, f2
+      |  bfextu AT, AT, 27, 27
     }
     if (op == BC_ISLT || op == BC_ISLE) {
-      |  //movf TMP2, r0
+      |  cmoveqz TMP2, AT, zero
     } else {
-      |  //movt TMP2, r0
+      |  cmovnez TMP2, AT, zero
     }
-#endif
     |  add PC, PC, TMP2
     |1:
     |  ins_next
@@ -2743,28 +2745,30 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   addli PC, PC, 4
     |  addi TMP0, RA, HI
     |  ld4s TMP0, TMP0
-    |   //ldc1 f0, 0(RA)
+    |   ld AT2, RA
     |  add RD, BASE, RD
     |    addi TMP2, PC, -4+OFS_RD
     |    ld2u TMP2, TMP2
     |   addi TMP1, RD, HI
     |   ld4s TMP1, TMP1
-    |   //ldc1 f2, 0(RD)
-    |    //lui TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
-    |  cmpltui AT, TMP0, LJ_TISNUM
-    |  cmpltui CARG1, TMP1, LJ_TISNUM
+    |   ld AT3, RD
+    |    moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |    shl16insli TMP3, TMP3, 0
+    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |  cmpltu AT1, TMP0, AT
+    |  cmpltu CARG1, TMP1, AT
     |    decode_RD4b TMP2
-    |  and AT, AT, CARG1
+    |  and AT, AT1, CARG1
     |   add TMP2, TMP2, TMP3
     |  beqz AT, >5
-    |  //c.eq.d f0, f2
-#if 0
+    |  fdouble_add_flags AT, AT2, AT3
+    |  bfextu AT, AT, 30, 30
     if (vk) {
-      |  //movf TMP2, r0
+      |  cmoveqz TMP2, AT, zero
     } else {
-      |  //movt TMP2, r0
+      |  cmovnez TMP2, AT, zero
     }
-#endif
     |1:
     |  add PC, PC, TMP2
     |  ins_next
@@ -2775,15 +2779,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s CARG3, CARG3
     |.if FFI
     |  addi TMP3, zero, LJ_TCDATA
-    |  cmpeq AT, TMP0, TMP3
-    |  bnez AT, ->vmeta_equal_cd
+    |  cmpeq AT1, TMP0, TMP3
+    |  bnez AT1, ->vmeta_equal_cd
     |.endif
-    |.  cmpltui AT, TMP0, LJ_TISPRI		// Not a primitive?
+    |  cmpltui AT, TMP0, LJ_TISPRI		// Not a primitive?
     |.if FFI
-    |  cmpeq AT, TMP1, TMP3
-    |  bnez AT, ->vmeta_equal_cd
+    |  cmpeq AT1, TMP1, TMP3
+    |  bnez AT1, ->vmeta_equal_cd
     |.endif
-    |.  xor TMP3, CARG2, CARG3			// Same tv?
+    |  xor TMP3, CARG2, CARG3			// Same tv?
     |  xor TMP1, TMP1, TMP0			// Same type?
     |  cmpltui CARG1, TMP0, LJ_TISTABUD+1		// Table or userdata?
     |  cmoveqz TMP3, AT, zero			// Ignore tv if primitive.
@@ -2905,7 +2909,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.endif
     |.  xor TMP0, TMP0, TMP1
     |  decode_RD4b TMP2
-    |  //lui TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |  moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |  shl16insli TMP3, TMP3, 0
     |  add TMP2, TMP2, TMP3
     if (vk) {
       |  cmovnez TMP2, TMP0, zero
@@ -4134,7 +4139,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpeq AT, TMP2, TISNIL
     |  bnez AT, <1		// Skip holes in array part.
     |    //cvt.d.w f2, f2
-    |     //lui TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |     moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |     shl16insli TMP3, TMP3, 0
     |   //sdc1 f0, 8(RA)
     |     decode_RD4b RD
     |     add RD, RD, TMP3
@@ -4167,7 +4173,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpeq AT, RB, TISNIL
     |  bnez AT, <6		// Skip holes in hash part.
     |   //ldc1 f2, NODE:TMP3->key
-    |     //lui TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |     moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |     shl16insli TMP3, TMP3, 0
     |  //sdc1 f0, 8(RA)
     |    add RC, RC, TMP0
     |     decode_RD4b RD
@@ -4202,7 +4209,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addli TMP1, TMP1, -FF_next_N
     |   add TMP0, PC, TMP0
     |  or TMP1, TMP1, TMP2
-    |  //lui TMP2, (-(BCBIAS_J*4 >> 16) & 65535)
+    |  moveli TMP2, (-(BCBIAS_J*4 >> 16) & 65535)
+    |  shl16insli TMP2, TMP2, 0
     |  bnez TMP1, >5
     |  add PC, TMP0, TMP2
     |  //lui TMP1, 0xfffe
@@ -4463,7 +4471,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     }
     if (op != BC_JFORL) {
       |  shrui RD, RD, 1
-      |  //lui TMP0, (-(BCBIAS_J*4 >> 16) & 65535)
+      |  moveli TMP0, (-(BCBIAS_J*4 >> 16) & 65535)
+      |  shl16insli TMP0, TMP0, 0
     }
     |  //c.le.d 0, f0, f2
     |  //c.le.d 1, f2, f0
