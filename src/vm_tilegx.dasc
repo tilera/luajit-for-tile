@@ -2856,28 +2856,31 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   addli PC, PC, 4
     |  addi TMP0, RA, HI
     |  ld4s TMP0, TMP0
-    |   //ldc1 f0, 0(RA)
+    |   ld AT2, RA
     |  add RD, KBASE, RD
     |    addi TMP2, PC, -4+OFS_RD
     |    ld2u TMP2, TMP2
-    |   //ldc1 f2, 0(RD)
+    |   ld AT3, RD
     |    moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
     |    shl16insli TMP3, TMP3, 0
-    |  cmpltui AT, TMP0, LJ_TISNUM
+    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |  cmpltu AT, TMP0, AT
     |    decode_RD4b TMP2
+    |   add TMP2, TMP2, TMP3
     |.if FFI
     |  beqz AT, >5
     |.else
     |  beqz AT, >1
     |.endif
-    |.   add TMP2, TMP2, TMP3
-    |   //c.eq.d f0, f2
+    |  fdouble_add_flags AT, AT2, AT3
+    |  bfextu AT, AT, 30, 30
     if (vk) {
-      |  //movf TMP2, r0
+      |  cmoveqz TMP2, AT, zero
       |  add PC, PC, TMP2
       |1:
     } else {
-      |  //movt TMP2, r0
+      |  cmovnez TMP2, AT, zero
       |1:
       |  add PC, PC, TMP2
     }
