@@ -2822,17 +2822,17 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s TMP0, TMP0
     |   shrui RD, RD, 1
     |  addi STR:TMP3, RA, LO
-    |  ld4s STR:TMP3, STR:TMP3
+    |  ld4u STR:TMP3, STR:TMP3
     |   sub RD, KBASE, RD
     |    addi TMP2, PC, -4+OFS_RD
     |    ld2u TMP2, TMP2
-    |  addi STR:TMP1, RD, -4
-    |  ld4u STR:TMP1, STR:TMP1
     |.if FFI
     |  addi AT, zero, LJ_TCDATA
     |  cmpeq AT, TMP0, AT
     |  bnez AT, ->vmeta_equal_cd
     |.endif
+    |  addi STR:TMP1, RD, -4
+    |  ld4u STR:TMP1, STR:TMP1
     |  addli TMP0, TMP0, -LJ_TSTR
     |   decode_RD4b TMP2
     |  xor TMP1, STR:TMP1, STR:TMP3
@@ -2972,9 +2972,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  // RA = dst*8, RD = src*8
     |  add RD, BASE, RD
     |  add RA, BASE, RA
-    |  //ldc1 f0, 0(RD)
+    |  ld AT2, RD
     |  ins_next1
-    |  //sdc1 f0, 0(RA)
+    |  st RA, AT2
     |  ins_next2
     break;
   case BC_NOT:
@@ -3178,10 +3178,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld BASE, AT
     |  bnez CRET1, ->vmeta_binop
     |  add RB, BASE, MULTRES
-    |  //ldc1 f0, 0(RB)
+    |  ld AT2, RB
     |   add RA, BASE, RA
     |  ins_next1
-    |   //sdc1 f0, 0(RA)			// Copy result from RB to RA.
+    |   st RA, AT2			// Copy result from RB to RA.
     |  ins_next2
     break;
 
