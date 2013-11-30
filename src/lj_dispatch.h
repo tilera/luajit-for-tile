@@ -13,6 +13,12 @@
 #endif
 
 #if defined(LJ_TARGET_MIPS) || defined(LJ_TARGET_TILEGX)
+
+#if defined(LJ_TARGET_TILEGX)
+/* Softfloat runtime declaration. */
+extern void * __divdf3(void);
+#endif
+
 /* Need our own global offset table for the dreaded MIPS calling conventions. */
 #if LJ_HASJIT
 #define JITGOTDEF(_)	_(lj_trace_exit) _(lj_trace_hot)
@@ -28,7 +34,7 @@
 #define GOTDEF(_) \
   _(floor) _(ceil) _(trunc) _(log) _(log10) _(exp) _(sin) _(cos) _(tan) \
   _(asin) _(acos) _(atan) _(sinh) _(cosh) _(tanh) _(frexp) _(modf) _(atan2) \
-  _(pow) _(fmod) _(ldexp) \
+  _(pow) _(fmod) _(ldexp) _(__divdf3) \
   _(lj_dispatch_call) _(lj_dispatch_ins) _(lj_err_throw) \
   _(lj_ffh_coroutine_wrap_err) _(lj_func_closeuv) _(lj_func_newL_gc) \
   _(lj_gc_barrieruv) _(lj_gc_step) _(lj_gc_step_fixtop) _(lj_meta_arith) \

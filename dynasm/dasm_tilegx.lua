@@ -309,9 +309,18 @@ local map_op = {
   cmpltui_3 =		"1830000051483000DAi",
 
   -- Float
+  mul_hu_lu_3 =		"0000000050EC0000EFC",
+  mul_lu_lu_3 =		"0000000050F80000EFC",
+  mula_hu_lu_3 =	"0000000050C00000EFC",
+  mul_hu_hu_3 =		"0000000050E40000EFC",
   fdouble_pack1_3 =	"0000000050740000EFC",
   fdouble_pack2_3 =	"0000000050780000EFC",
   fdouble_add_flags_3 =	"00000000506C0000EFC",
+  fdouble_sub_flags_3 =	"00000000507C0000EFC",
+  fdouble_mul_flags_3 =	"0000000050700000EFC",
+  fdouble_addsub_3 =	"0000000050680000EFC",
+  fdouble_unpack_min_3 =	"0000000050840000EFC",
+  fdouble_unpack_max_3 =	"0000000050800000EFC",
 }
 
 ------------------------------------------------------------------------------

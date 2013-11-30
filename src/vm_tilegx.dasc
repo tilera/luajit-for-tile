@@ -35,20 +35,22 @@
 |.define TISNIL,	r52
 |
 |// The following temporaries are not saved across C calls, except for RA.
-|.define RB,		r17
-|.define RC,		r18
-|.define RD,		r19
-|.define INS,		r20
+|.define RB,		r15
+|.define RC,		r16
+|.define RD,		r17
+|.define INS,		r18
 |
-|.define TMP0,		r21
-|.define TMP1,		r22
-|.define TMP2,		r23
-|.define TMP3,		r24
+|.define TMP0,		r19
+|.define TMP1,		r20
+|.define TMP2,		r21
+|.define TMP3,		r22
 |
-|.define AT,		r25
-|.define AT1,		r26
-|.define AT2,		r27 // For softfloat
-|.define AT3,		r28 // For softfloat
+|.define AT,		r23
+|.define AT1,		r24
+|.define AT2,		r25 // For softfloat
+|.define AT3,		r26 // For softfloat
+|.define AT4,		r27 // For softfloat
+|.define AT5,		r28 // For softfloat
 
 |// Calling conventions.
 |// TileGX PIC don't require function address pre-loaded into a specific
@@ -3063,18 +3065,22 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    add CARG4, KBASE, RC
     |   addi TMP1, CARG3, HI
     |   ld4s TMP1, TMP1
-    |   //ldc1 f20, 0(CARG3)
-    |    //ldc1 f22, 0(CARG4)
-    |   cmpltui AT, TMP1, LJ_TISNUM
+    |   ld AT2, CARG3
+    |   ld AT3, CARG4
+    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |   cmpltu AT, TMP1, AT
     ||  break;
     ||case 1:
     |   add CARG4, BASE, RB
     |    add CARG3, KBASE, RC
     |   addi TMP1, CARG4, HI
     |   ld4s TMP1, TMP1
-    |   //ldc1 f22, 0(CARG4)
-    |    //ldc1 f20, 0(CARG3)
-    |   cmpltui AT, TMP1, LJ_TISNUM
+    |   ld AT3, CARG4
+    |    ld AT2, CARG3
+    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |   cmpltu AT, TMP1, AT
     ||  break;
     ||default:
     |   add CARG3, BASE, RB
@@ -3083,15 +3089,17 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   ld4s TMP1, TMP1
     |    addi TMP2, CARG4, HI
     |    ld4s TMP2, TMP2
-    |   //ldc1 f20, 0(CARG3)
-    |    //ldc1 f22, 0(CARG4)
-    |   cmpltui AT, TMP1, LJ_TISNUM
-    |   cmpltui TMP0, TMP2, LJ_TISNUM
+    |   ld AT2, CARG3
+    |    ld AT3, CARG4
+    |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
+    |   cmpltu AT, TMP1, AT1
+    |   cmpltu TMP0, TMP2, AT1
     |   and AT, AT, TMP0
     ||  break;
     ||}
+    |  add RA, BASE, RA
     |  beqz AT, ->vmeta_arith
-    |.  add RA, BASE, RA
     |.endmacro
     |
     |.macro fpmod, a, b, c
@@ -3106,25 +3114,59 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_arithpre
     |.if "ins" == "fpmod_"
     |  b ->BC_MODVN_Z			// Avoid 3 copies. It's slow anyway.
-    |.else
-    |  //ins f0, f20, f22
-    |  ins_next1
-    |  //sdc1 f0, 0(RA)
-    |  ins_next2
+    |.elif "ins" == "add"
+    |  fdouble_add_flags AT, AT2, AT3
+    |  fdouble_unpack_min AT1, AT2, AT3
+    |  fdouble_unpack_max AT3, AT2, AT3
+    |  fdouble_addsub AT3, AT1, AT
+    |  fdouble_pack1 AT2, AT3, AT
+    |  fdouble_pack2 AT2, AT3, zero
+    |.elif "ins" == "sub"
+    |  fdouble_sub_flags AT, AT2, AT3
+    |  fdouble_unpack_min AT1, AT2, AT3
+    |  fdouble_unpack_max AT3, AT2, AT3
+    |  fdouble_addsub AT3, AT1, AT
+    |  fdouble_pack1 AT2, AT3, AT
+    |  fdouble_pack2 AT2, AT3, zero
+    |.elif "ins" == "mul"
+    |  fdouble_unpack_max AT, AT2, zero
+    |  fdouble_unpack_max AT1, AT3, zero
+    |  fdouble_mul_flags AT2, AT2, AT3
+    |  mul_hu_lu AT3, AT, AT1
+    |  mul_lu_lu AT4, AT, AT1
+    |  mula_hu_lu AT3, AT1, AT
+    |  mul_hu_hu AT, AT, AT1
+    |  shli AT5, AT3, 32
+    |  shrui AT3, AT3, 32
+    |  add AT4, AT4, AT5
+    |  add AT3, AT, AT3
+    |  cmpltu AT5, AT4, AT5
+    |  add AT3, AT3, AT5
+    |  fdouble_pack1 AT2, AT3, AT2
+    |  fdouble_pack2 AT2, AT3, AT4
+    |.else  // div
+    |  move CARG1, AT2
+    |  move CARG2, AT3
+    |  load_got __divdf3
+    |  call_intern __divdf3
+    |  move AT2, CRET1
     |.endif
+    |  ins_next1
+    |  st RA, AT2
+    |  ins_next2
     |.endmacro
 
   case BC_ADDVN: case BC_ADDNV: case BC_ADDVV:
-    |  //ins_arith add.d
+    |  ins_arith add
     break;
   case BC_SUBVN: case BC_SUBNV: case BC_SUBVV:
-    |  //ins_arith sub.d
+    |  ins_arith sub
     break;
   case BC_MULVN: case BC_MULNV: case BC_MULVV:
-    |  //ins_arith mul.d
+    |  ins_arith mul
     break;
   case BC_DIVVN: case BC_DIVNV: case BC_DIVVV:
-    |  //ins_arith div.d
+    |  ins_arith div
     break;
   case BC_MODVN:
     |  //ins_arith fpmod
@@ -3284,9 +3326,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next1
     |  addlo TMP1, UPVAL:RB->v
     |  ld TMP1, TMP1
-    |  //ldc1 f0, 0(TMP1)
+    |  ld AT2, TMP1
     |  add RA, BASE, RA
-    |  //sdc1 f0, 0(RA)
+    |  st RA, AT2
     |  ins_next2
     break;
   case BC_USETV:
@@ -3296,7 +3338,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    shrui RA, RA, 1
     |   add RD, BASE, RD
     |    add RA, RA, LFUNC:RB
-    |   //ldc1 f0, 0(RD)
+    |   ld AT2, RD
     |  addlo UPVAL:RB, LFUNC:RA->uvptr
     |  ld UPVAL:RB, UPVAL:RB
     |  addlo TMP3, UPVAL:RB->marked
@@ -3308,7 +3350,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld1u TMP0, TMP0
     |   addi TMP2, RD, HI
     |   ld4s TMP2, TMP2
-    |   //sdc1 f0, 0(CARG2)
+    |   st CARG2, AT2
     |  addi AT, zero, LJ_GC_BLACK|1
     |  or TMP3, TMP3, TMP0
     |  addli TMP2, TMP2, -(LJ_TISNUM+1)
