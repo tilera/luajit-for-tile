@@ -158,14 +158,13 @@
 |
 |//-----------------------------------------------------------------------
 |
-|// Endian-specific defines.
 |.define FRAME_PC,	-4
 |.define FRAME_FUNC,	-8
-|.define HI,		4
 |.define LO,		0
-|.define OFS_RD,	LJ_ENDIAN_SELECT(2,0)
-|.define OFS_RA,	LJ_ENDIAN_SELECT(1,2)
-|.define OFS_OP,	LJ_ENDIAN_SELECT(0,3)
+|.define HI,		4
+|.define OFS_OP,	0
+|.define OFS_RA,	1
+|.define OFS_RD,	2
 |
 |// Instruction decode.
 |.macro decode_OP1, dst, ins; bfextu dst, ins, 0, 7; .endmacro
@@ -857,12 +856,13 @@ static void build_subroutines(BuildCtx *ctx)
   |3:
   |  cmpltui AT, CRET1, 2
   |  beqz AT, ->vmeta_binop
-  |   //negu TMP2, CRET1
+  |  sub TMP2, zero, CRET1
   |4:
   |  addi RD, PC, OFS_RD
   |  ld2u RD, RD
   |   addli PC, PC, 4
-  |   //lui TMP1, (-(BCBIAS_J*4 >> 16) & 65535)
+  |   moveli TMP1, (-(BCBIAS_J*4 >> 16) & 65535)
+  |   shl16insli TMP1, TMP1, 0
   |  shli RD, RD, 2
   |  add RD, RD, TMP1
   |  and RD, RD, TMP2
@@ -2805,7 +2805,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  // Different tables or userdatas. Need to check __eq metamethod.
     |  // Field metatable must be at same offset for GCtab and GCudata!
     |  addlo TAB:TMP1, TAB:CARG2->metatable
-    |  ld TAB:TMP1, TAB:TMP1
+    |  ld4u TAB:TMP1, TAB:TMP1
     |  beqz TAB:TMP1, <1		// No metatable?
     |  addlo TMP1, TAB:TMP1->nomm
     |  ld1u TMP1, TMP1
