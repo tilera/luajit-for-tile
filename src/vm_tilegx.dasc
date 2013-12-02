@@ -3112,9 +3112,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |
     |.macro ins_arith, ins
     |  ins_arithpre
-    |.if "ins" == "fpmod_"
-    |  b ->BC_MODVN_Z			// Avoid 3 copies. It's slow anyway.
-    |.elif "ins" == "add"
+    |.if "ins" == "add"
     |  fdouble_add_flags AT, AT2, AT3
     |  fdouble_unpack_min AT1, AT2, AT3
     |  fdouble_unpack_max AT3, AT2, AT3
@@ -3144,11 +3142,17 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add AT3, AT3, AT5
     |  fdouble_pack1 AT2, AT3, AT2
     |  fdouble_pack2 AT2, AT3, AT4
-    |.else  // div
+    |.elif "ins" == "div"
     |  move CARG1, AT2
     |  move CARG2, AT3
     |  load_got __divdf3
     |  call_intern __divdf3
+    |  move AT2, CRET1
+    |.else
+    |  move CARG1, AT2
+    |  move CARG2, AT3
+    |  load_got fmod
+    |  call_intern fmod
     |  move AT2, CRET1
     |.endif
     |  ins_next1
@@ -3168,11 +3172,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_DIVVN: case BC_DIVNV: case BC_DIVVV:
     |  ins_arith div
     break;
-  case BC_MODVN:
-    |  //ins_arith fpmod
-    break;
-  case BC_MODNV: case BC_MODVV:
-    |  //ins_arith fpmod_
+  case BC_MODVN: case BC_MODNV: case BC_MODVV:
+    |  ins_arith fpmod
     break;
   case BC_POW:
     |  decode_RB8a RB, INS
@@ -3184,17 +3185,19 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s TMP1, TMP1
     |   addi TMP2, CARG4, HI
     |   ld4s TMP2, TMP2
-    |  //ldc1 FARG1, 0(CARG3)
-    |   //ldc1 FARG2, 0(CARG4)
-    |  cmpltui AT, TMP1, LJ_TISNUM
-    |  cmpltui TMP0, TMP2, LJ_TISNUM
-    |  and AT, AT, TMP0
+    |  ld CARG1, CARG3
+    |   ld CARG2, CARG4
+    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |  cmpltu AT, TMP1, AT
+    |  cmpltu TMP0, TMP2, AT
+    |  and AT, AT1, TMP0
     |  load_got pow
     |  add RA, BASE, RA
     |  beqz AT, ->vmeta_arith
     |  call_extern
     |  ins_next1
-    |  //sdc1 FRET1, 0(RA)
+    |  st RA, CRET1
     |  ins_next2
     break;
 
