@@ -3024,19 +3024,26 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpne AT1, TMP0, AT1
     |  bnez AT1, >2
     |  addlo CRET1, STR:CARG1->len
-    |  ld CRET1, CRET1
+    |  ld4u CRET1, CRET1
     |1:
-    |  //mtc1 CRET1, f0
-    |  //cvt.d.w f0, f0
+    |  cmpltsi AT, CRET1, 0
+    |  sub AT1, zero, CRET1
+    |  moveli AT2, 539
+    |  cmovnez CRET1, AT, AT1
+    |  shli AT2, AT2, 8
+    |  shli AT1, CRET1, 4
+    |  bfins AT2, AT, 20, 20
+    |  fdouble_pack1 CRET1, AT1, AT2
+    |  fdouble_pack2 CRET1, AT1, zero
     |  ins_next1
-    |  //sdc1 f0, 0(RA)
+    |  st RA, CRET1
     |  ins_next2
     |2:
     |  cmpne AT, TMP0, AT
     |  bnez AT, ->vmeta_len
 #if LJ_52
     |  addlo TAB:TMP2, TAB:CARG1->metatable
-    |  ld TAB:TMP2, TAB:TMP2
+    |  ld4u TAB:TMP2, TAB:TMP2
     |  bnez TAB:TMP2, >9
     |3:
 #endif

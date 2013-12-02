@@ -79,16 +79,16 @@ local function writeactions(out, name)
   if nn == 0 then nn = 1; actlist[0] = map_action.STOP end
   out:write("static const unsigned long ", name, "[", nn, "] = {\n")
   for i = 1,nn-1 do
-    if (sub(string.format("%016X", actlist[i]), 1, 8) == "00000000") then
+    if (sub(string.format("%016X", actlist[i]), 1, 8) == "00000001") then
       -- X0 bundle.
-      assert(out:write("0x286A3000", string.format("%08X", actlist[i]), "L,\n"))
+      assert(out:write("0x286A3000", sub(string.format("%08X", actlist[i]), 2, 9), "L,\n"))
     else
       assert(out:write("0x", string.format("%016X", actlist[i]), "L,\n"))
     end
   end
-  if (sub(string.format("%016X", actlist[nn]), 1, 8) == "00000000") then
+  if (sub(string.format("%016X", actlist[nn]), 1, 8) == "00000001") then
     -- X0 bundle.
-    assert(out:write("0x286A3000", string.format("%08X", actlist[nn]), "L,\n"))
+    assert(out:write("0x286A3000", sub(string.format("%08X", actlist[nn]), 2, 9), "L,\n"))
   else
     assert(out:write("0x", string.format("%016X", actlist[nn]), "L\n};\n\n"))
   end
@@ -269,11 +269,11 @@ local map_op = {
   shrs_3 =		"284E000051483000DAB",
   shrsi_3 =		"3008000051483000DAi",
   -- bfextu_4 =		"286A300035000000EFGH",
-  bfextu_4 =		"0000000035000000EFGH",
-  bfexts_4 =		"0000000034000000EFGH",
-  bfins_4 =		"0000000036000000EFGH",
-  cmoveqz_3 =		"0000000050140000EFC",
-  cmovnez_3 =		"0000000050180000EFC",
+  bfextu_4 =		"0000000135000000EFGH",
+  bfexts_4 =		"0000000134000000EFGH",
+  bfins_4 =		"0000000136000000EFGH",
+  cmoveqz_3 =		"0000000150140000EFC",
+  cmovnez_3 =		"0000000150180000EFC",
 
   -- Memory Instructions.
   st_2 =		"DE064000340C3000ab",
@@ -310,18 +310,18 @@ local map_op = {
   cmpltui_3 =		"1830000051483000DAi",
 
   -- Float
-  mul_hu_lu_3 =		"0000000050EC0000EFC",
-  mul_lu_lu_3 =		"0000000050F80000EFC",
-  mula_hu_lu_3 =	"0000000050C00000EFC",
-  mul_hu_hu_3 =		"0000000050E40000EFC",
-  fdouble_pack1_3 =	"0000000050740000EFC",
-  fdouble_pack2_3 =	"0000000050780000EFC",
-  fdouble_add_flags_3 =	"00000000506C0000EFC",
-  fdouble_sub_flags_3 =	"00000000507C0000EFC",
-  fdouble_mul_flags_3 =	"0000000050700000EFC",
-  fdouble_addsub_3 =	"0000000050680000EFC",
-  fdouble_unpack_min_3 =	"0000000050840000EFC",
-  fdouble_unpack_max_3 =	"0000000050800000EFC",
+  mul_hu_lu_3 =		"0000000150EC0000EFC",
+  mul_lu_lu_3 =		"0000000150F80000EFC",
+  mula_hu_lu_3 =	"0000000150C00000EFC",
+  mul_hu_hu_3 =		"0000000150E40000EFC",
+  fdouble_pack1_3 =	"0000000150740000EFC",
+  fdouble_pack2_3 =	"0000000150780000EFC",
+  fdouble_add_flags_3 =	"00000001506C0000EFC",
+  fdouble_sub_flags_3 =	"00000001507C0000EFC",
+  fdouble_mul_flags_3 =	"0000000150700000EFC",
+  fdouble_addsub_3 =	"0000000150680000EFC",
+  fdouble_unpack_min_3 =	"0000000150840000EFC",
+  fdouble_unpack_max_3 =	"0000000150800000EFC",
 }
 
 ------------------------------------------------------------------------------
