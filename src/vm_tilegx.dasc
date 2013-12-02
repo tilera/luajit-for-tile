@@ -2999,12 +2999,16 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   add RA, BASE, RA
     |  addi TMP0, CARG3, HI
     |  ld4s TMP0, TMP0
-    |   //ldc1 f0, 0(CARG3)
-    |  cmpltui AT, TMP0, LJ_TISNUM
-    |  //neg.d f0, f0
+    |   ld AT2, CARG3
+    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |  cmpltu AT, TMP0, AT
+    |  movei AT1, -1
+    |  shli AT1, AT1, 63
+    |  xor AT2, AT2, AT1
     |  beqz AT, ->vmeta_unm
     |  ins_next1
-    |   //sdc1 f0, 0(RA)
+    |   st RA, AT2
     |  ins_next2
     break;
   case BC_LEN:
