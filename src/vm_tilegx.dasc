@@ -3227,7 +3227,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   ld CARG2, CARG4
     |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
     |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-    |  cmpltu AT, TMP1, AT
+    |  cmpltu AT1, TMP1, AT
     |  cmpltu TMP0, TMP2, AT
     |  and AT, AT1, TMP0
     |  load_got pow
@@ -3367,7 +3367,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next1
     |  addlo TMP1, UPVAL:RB->v
     |  ld4u TMP1, TMP1
-    |  ld4u AT2, TMP1
+    |  ld AT2, TMP1
     |  add RA, BASE, RA
     |  st RA, AT2
     |  ins_next2
@@ -3938,16 +3938,16 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addi AT, zero, LJ_TSTR
     |    addlo NODE:TMP1, NODE:TMP2->next
     |    ld4u NODE:TMP1, NODE:TMP1
-    |   addli AT, NODE:TMP2, offsetof(Node, val)+HI
-    |   ld4s CARG2, AT
+    |   addli CARG2, NODE:TMP2, offsetof(Node, val)+HI
+    |   ld4s CARG2, CARG2
     |  cmpne AT, CARG1, AT
     |  bnez AT, >5
-    |    addlo AT, TAB:RB->marked
-    |    ld1u TMP3, AT
+    |    addlo TMP3, TAB:RB->marked
+    |    ld1u TMP3, TMP3
     |   cmpne AT, TMP0, STR:RC
     |   bnez AT, >5
-    |    addlo AT, TAB:RB->metatable
-    |    ld4u TAB:TMP0, AT
+    |    addlo TAB:TMP0, TAB:RB->metatable
+    |    ld4u TAB:TMP0, TAB:TMP0
     |    cmpeq AT, CARG2, TISNIL
     |    bnez AT, >4		// Key found, but nil value?
     |2:
