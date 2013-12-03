@@ -3113,14 +3113,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  beqz AT, ->vmeta_arith
     |.endmacro
     |
-    |.macro fpmod, a, b, c
-    |->BC_MODVN_Z:
-    |  //div.d FARG1, b, c
-    |  jal ->vm_floor			// floor(b/c)
-    |  //mul.d a, FRET1, c
-    |  //sub.d a, b, a			// b - floor(b/c)*c
-    |.endmacro
-    |
     |.macro ins_arith, ins
     |  ins_arithpre
     |.if "ins" == "add"
@@ -3184,7 +3176,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_arith div
     break;
   case BC_MODVN: case BC_MODNV: case BC_MODVV:
-    |  ins_arith fpmod
+    |  ins_arith mod
     break;
   case BC_POW:
     |  decode_RB8a RB, INS
@@ -3339,8 +3331,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld UPVAL:RB, UPVAL:RB
     |  ins_next1
     |  addlo TMP1, UPVAL:RB->v
-    |  ld TMP1, TMP1
-    |  ld AT2, TMP1
+    |  ld4u TMP1, TMP1
+    |  ld4u AT2, TMP1
     |  add RA, BASE, RA
     |  st RA, AT2
     |  ins_next2
@@ -3358,7 +3350,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addlo TMP3, UPVAL:RB->marked
     |  ld1u TMP3, TMP3
     |   addlo CARG2, UPVAL:RB->v
-    |   ld CARG2, CARG2
+    |   ld4u CARG2, CARG2
     |  andi TMP3, TMP3, LJ_GC_BLACK	// isblack(uv)
     |  addlo TMP0, UPVAL:RB->closed
     |  ld1u TMP0, TMP0
@@ -3375,8 +3367,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |
     |2:  // Check if new value is collectable.
     |  cmpltui AT, TMP2, LJ_TISGCV - (LJ_TISNUM+1)
-    |  addi AT, RD, LO
-    |  ld4s TMP1, AT
+    |  addi TMP1, RD, LO
+    |  ld4s TMP1, TMP1
     |  beqz AT, <1			// tvisgcv(v)
     |  addlo TMP3, GCOBJ:TMP1->gch.marked
     |  ld1u TMP3, TMP3
@@ -3399,21 +3391,21 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addlo UPVAL:RB, LFUNC:RA->uvptr
     |  ld UPVAL:RB, UPVAL:RB
     |   addi STR:TMP1, TMP1, -4
-    |   ld STR:TMP1, STR:TMP1
+    |   ld4u STR:TMP1, STR:TMP1
     |  addlo TMP2, UPVAL:RB->marked
     |  ld1u TMP2, TMP2
     |   addlo CARG2, UPVAL:RB->v
-    |   ld CARG2, CARG2
+    |   ld4u CARG2, CARG2
     |   addlo TMP3, STR:TMP1->marked
     |   ld1u TMP3, TMP3
     |  andi AT, TMP2, LJ_GC_BLACK	// isblack(uv)
     |   addlo TMP2, UPVAL:RB->closed
     |   ld1u TMP2, TMP2
     |   addi TMP0, zero, LJ_TSTR
-    |   addi AT, CARG2, LO
-    |   st4 AT, STR:TMP1
-    |  addi AT, CARG2, HI
-    |  st4 AT, TMP0
+    |   addi AT1, CARG2, LO
+    |   st4 AT1, STR:TMP1
+    |  addi AT1, CARG2, HI
+    |  st4 AT1, TMP0
     |  bnez AT, >2
     |1:
     |  ins_next
@@ -3435,13 +3427,13 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   shrui RA, RA, 1
     |    add RD, KBASE, RD
     |   add RA, RA, LFUNC:RB
-    |    //ldc1 f0, 0(RD)
+    |    ld AT2, RD
     |  addlo UPVAL:RB, LFUNC:RA->uvptr
     |  ld UPVAL:RB, UPVAL:RB
     |  ins_next1
     |  addlo TMP1, UPVAL:RB->v
-    |  ld TMP1, TMP1
-    |  //sdc1 f0, 0(TMP1)
+    |  ld4u TMP1, TMP1
+    |  st TMP1, AT2
     |  ins_next2
     break;
   case BC_USETP:
@@ -3456,7 +3448,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld UPVAL:RB, UPVAL:RB
     |  ins_next1
     |  addlo TMP1, UPVAL:RB->v
-    |  ld TMP1, TMP1
+    |  ld4u TMP1, TMP1
     |  addi AT, TMP1, HI
     |  st4 AT, TMP0
     |  ins_next2
