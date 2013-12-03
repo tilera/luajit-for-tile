@@ -4214,9 +4214,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s TMP1, TMP1
     |   addi LFUNC:RB, BASE, -24+LO
     |   ld4s LFUNC:RB, LFUNC:RB
-    |    add AT2, BASE, -8
+    |    addi AT2, BASE, -8
     |    ld AT2, AT2
-    |    add AT3, BASE, -16
+    |    addi AT3, BASE, -16
     |    ld AT3, AT3
     |  addi AT, BASE, HI
     |  st4 AT, TMP1
@@ -4475,10 +4475,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  sub BASE, TMP2, TMP0
     |  beqz RC, >3
     |2:
-    |   ld AT, RA
+    |   ld AT2, RA
     |    addli RA, RA, 8
     |  addli RC, RC, -8
-    |   st TMP2, AT
+    |   st TMP2, AT2
     |  addli TMP2, TMP2, 8
     |  bnez RC, <2
     |3:
@@ -4580,13 +4580,22 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     vk = (op == BC_IFORL || op == BC_JFORL);
     |  add RA, BASE, RA
     if (vk) {
-      |  //ldc1 f0, FORL_IDX*8(RA)
-      |  //ldc1 f4, FORL_STEP*8(RA)
-      |  //ldc1 f2, FORL_STOP*8(RA)
+      |  addi AT2, RA, FORL_IDX*8
+      |  ld AT2, AT2
+      |  addi AT4, RA, FORL_STEP*8
+      |  ld AT4, AT4
+      |  addi AT3, RA, FORL_STOP*8
+      |  ld AT3, AT3
       |   addi TMP3, RA, FORL_STEP*8+HI
       |   ld4s TMP3, TMP3
-      |  //add.d f0, f0, f4
-      |  //sdc1 f0, FORL_IDX*8(RA)
+      |  fdouble_add_flags AT, AT2, AT4
+      |  fdouble_unpack_min AT1, AT2, AT4
+      |  fdouble_unpack_max AT4, AT2, AT4
+      |  fdouble_addsub AT4, AT1, AT
+      |  fdouble_pack1 AT2, AT4, AT
+      |  fdouble_pack2 AT2, AT4, zero
+      |  addi AT, RA, FORL_IDX*8
+      |  st AT, AT2
     } else {
       |  addi TMP1, RA, FORL_IDX*8+HI
       |  ld4s TMP1, TMP1
@@ -4594,13 +4603,17 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  ld4s TMP3, TMP3
       |  addi TMP2, RA, FORL_STOP*8+HI
       |  ld4s TMP2, TMP2
-      |  cmpltui TMP1, TMP1, LJ_TISNUM
-      |  cmpltui TMP0, TMP3, LJ_TISNUM
-      |  cmpltui TMP2, TMP2, LJ_TISNUM
+      |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+      |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+      |  cmpltu TMP1, TMP1, AT
+      |  cmpltu TMP0, TMP3, AT
+      |  cmpltu TMP2, TMP2, AT
       |  and TMP1, TMP1, TMP0
       |  and TMP1, TMP1, TMP2
-      |   //ldc1 f0, FORL_IDX*8(RA)
-      |  //ldc1 f2, FORL_STOP*8(RA)
+      |   addi AT2, RA, FORL_IDX*8
+      |   ld AT2, AT2
+      |  addi AT3, RA, FORL_STOP*8
+      |  ld AT3, AT3
       |  beqz TMP1, ->vmeta_for
     }
     if (op != BC_JFORL) {
@@ -4608,17 +4621,20 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  moveli TMP0, (-(BCBIAS_J*4 >> 16) & 65535)
       |  shl16insli TMP0, TMP0, 0
     }
-    |  //c.le.d 0, f0, f2
-    |  //c.le.d 1, f2, f0
-    |  //sdc1 f0, FORL_EXT*8(RA)
+    |  fdouble_add_flags AT, AT2, AT3
+    |  fdouble_add_flags AT1, AT3, AT2
+    |  addi AT4, RA, FORL_EXT*8
+    |  st AT4, AT2
     if (op == BC_JFORI) {
       |  addi TMP1, zero, 1
       |  addi TMP2, zero, 1
       |   add TMP0, RD, TMP0
       |  cmplts TMP3, TMP3, zero
-      |  //movf TMP1, r0, 0
+      |  bfextu AT4, AT, 27, 27
+      |  cmoveqz TMP1, AT4, zero 
       |   add PC, PC, TMP0
-      |  //movf TMP2, r0, 1
+      |  bfextu AT4, AT1, 27, 27
+      |  cmoveqz TMP2, AT4, zero
       |   addi RD, PC, -4+OFS_RD
       |   ld2u RD, RD
       |  cmovnez TMP1, TMP3, TMP2
@@ -4628,20 +4644,26 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  addi TMP1, zero, 1
       |  addi TMP2, zero, 1
       |  cmplts TMP3, TMP3, zero
-      |  //movf TMP1, r0, 0
-      |  //movf TMP2, r0, 1
-      |  //movn TMP1, TMP2, TMP3
+      |  bfextu AT4, AT, 27, 27
+      |  cmoveqz TMP1, AT4, zero
+      |  bfextu AT4, AT1, 27, 27
+      |  cmoveqz TMP2, AT4, zero
+      |  cmovnez TMP1, TMP3, TMP2
       |  bnez TMP1, =>BC_JLOOP
     } else {
       |  add TMP1, RD, TMP0
       |  cmplts TMP3, TMP3, zero
       |  move TMP2, TMP1
       if (op == BC_FORI) {
-	|  //movt TMP1, r0, 0
-	|  //movt TMP2, r0, 1
+        |  bfextu AT4, AT, 27, 27
+	|  cmovnez TMP1, AT4, zero
+        |  bfextu AT4, AT1, 27, 27
+	|  cmovnez TMP2, AT4, zero
       } else {
-	|  //movf TMP1, r0, 0
-	|  //movf TMP2, r0, 1
+        |  bfextu AT4, AT, 27, 27
+	|  cmoveqz TMP1, AT4, zero
+        |  bfextu AT4, AT1, 27, 27
+	|  cmoveqz TMP2, AT4, zero
       }
       |  cmovnez TMP1, TMP3, TMP2
       |  add PC, PC, TMP1
