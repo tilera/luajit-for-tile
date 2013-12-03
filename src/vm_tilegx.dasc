@@ -28,6 +28,10 @@
 |.define MULTRES,	r35	// Size of multi-result: (nresults+1)*8.
 |//                     r36     // not used.
 |.define RA,		r37	// RA need to be callee-save.
+|.define CROSSTMP1,	r38	// TMP used to hold variable which need to be alive across C call.
+|.define CROSSTMP2,	r39
+|.define CROSSTMP3,	r40
+|.define CROSSTMP4,	r41
 |
 |.define JGL,		r52	// On-trace: global_State + 32768.
 |
@@ -69,14 +73,14 @@
 |.define CRET2,		r1
 |
 |// Stack layout while in interpreter. Must match with lj_frame.h.
-|.define CFRAME_SPACE,	112	// Delta for sp.
+|.define CFRAME_SPACE,	144	// Delta for sp.
 |
-|.define SAVE_ERRF,	136	// 64 bit C frame info.
-|.define SAVE_NRES,	128
-|.define SAVE_CFRAME,	120
-|.define SAVE_L,	112
+|.define SAVE_ERRF,	168	// 64 bit C frame info.
+|.define SAVE_NRES,	160
+|.define SAVE_CFRAME,	152
+|.define SAVE_L,	144
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by interpreter.
-|.define TILE_ABI_RESERV,	32	// .. 32+10*8: 64 bit GPR saves.
+|.define TILE_ABI_RESERV,	32	// .. 32+14*8: 64 bit GPR saves.
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
 |
@@ -100,6 +104,14 @@
 |  addi sp, sp, -8
 |  st sp, r37
 |  addi sp, sp, -8
+|  st sp, r38
+|  addi sp, sp, -8
+|  st sp, r39
+|  addi sp, sp, -8
+|  st sp, r40
+|  addi sp, sp, -8
+|  st sp, r41
+|  addi sp, sp, -8
 |  st sp, r52
 |  addi sp, sp, -8
 |  st sp, lr
@@ -111,6 +123,14 @@
 |  ld lr, sp
 |  addi sp, sp, 8
 |  ld r52, sp
+|  addi sp, sp, 8
+|  ld r41, sp
+|  addi sp, sp, 8
+|  ld r40, sp
+|  addi sp, sp, 8
+|  ld r39, sp
+|  addi sp, sp, 8
+|  ld r38, sp
 |  addi sp, sp, 8
 |  ld r37, sp
 |  addi sp, sp, 8
@@ -439,7 +459,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  move sp, CARG1
   |  move CRET1, CARG2
   |->vm_unwind_c_eh:			// Landing pad for external unwinder.
-  |  addi L, sp, SAVE_L
+  |  addli L, sp, SAVE_L
   |  ld L, L
   |   addi TMP0, zero, ~LJ_VMST_C
   |  addlo GL:TMP1, L:LREG->glref
@@ -453,7 +473,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi AT, zero, -4
   |  and sp, CARG1, AT
   |->vm_unwind_ff_eh:			// Landing pad for external unwinder.
-  |  addi L, sp, SAVE_L
+  |  addli L, sp, SAVE_L
   |  ld L, L
   |     //lui TMP3, 0x59c0		// TOBIT = 2^52 + 2^51 (float).
   |     addi TISNIL, zero, LJ_TNIL
@@ -523,7 +543,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  move BASE, CARG2
   |    addlo AT, L:LREG->status
   |    ld1u TMP1, AT
-  |   addi AT, sp, SAVE_L
+  |   addli AT, sp, SAVE_L
   |   st AT, L
   |  addi PC, zero, FRAME_CP
   |  addli TMP0, sp, CFRAME_RESUME
@@ -534,7 +554,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   st AT, zero
   |  addlo AT, L:LREG->cframe
   |  st AT, TMP0
-  |   addi AT, sp, SAVE_CFRAME
+  |   addli AT, sp, SAVE_CFRAME
   |   st AT, zero
   |   addi AT, sp, SAVE_PC
   |  st AT, CARG1
@@ -582,7 +602,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   addli AT, sp, SAVE_NRES
   |   st AT, CARG3
   |    move L, CARG1
-  |   addi AT, sp, SAVE_L
+  |   addli AT, sp, SAVE_L
   |   st AT, CARG1
   |    move BASE, CARG2
   |  addlo AT, L:LREG->cframe			// Add our C frame to cframe chain.
@@ -591,7 +611,7 @@ static void build_subroutines(BuildCtx *ctx)
   |    ld4u DISPATCH, DISPATCH
   |   addi AT, sp, SAVE_PC
   |   st AT, CARG1
-  |  addi AT, sp, SAVE_CFRAME
+  |  addli AT, sp, SAVE_CFRAME
   |  st AT, TMP1
   |    addli DISPATCH, DISPATCH, GG_G2DISP
   |
@@ -627,7 +647,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  move L, CARG1
   |   addlo TMP0, L:CARG1->stack
   |   ld4u TMP0, TMP0
-  |  addi AT, sp, SAVE_L
+  |  addli AT, sp, SAVE_L
   |  st AT, CARG1
   |   addlo TMP1, L:CARG1->top
   |   ld TMP1, TMP1
@@ -641,7 +661,7 @@ static void build_subroutines(BuildCtx *ctx)
   |    st AT, TMP0
   |  addli AT, sp, SAVE_ERRF		// No error function.
   |   st AT, r0
-  |  addi AT, sp, SAVE_CFRAME
+  |  addli AT, sp, SAVE_CFRAME
   |  st AT, TMP1
   |  jalr CARG4			// (lua_State *L, lua_CFunction func, void *ud)
   |  move BASE, CRET1
@@ -2436,14 +2456,14 @@ static void build_subroutines(BuildCtx *ctx)
   |   ld BASE, BASE
   |  and sp, TMP1, AT
   |   ld PC, sp
-  |  addi AT, L, SAVE_L
+  |  addli AT, L, SAVE_L
   |  st AT, L
   |  b >1
   |.endif
   |->vm_exit_interp:
   |.if JIT
   |  // CRET1 = MULTRES or negated error code, BASE, PC and JGL set.
-  |  addi L, sp, SAVE_L
+  |  addli L, sp, SAVE_L
   |  ld L, L
   |  addli DISPATCH, JGL, -GG_DISP2G-32768
   |1:
@@ -3532,7 +3552,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  // Returns Table *.
     } else {
       |  load_got lj_tab_dup
-      |  shli TMP1, RD, 1
+      |  shrui TMP1, RD, 1
       |  sub TMP1, KBASE, TMP1
       |  move CARG1, L
       |  addi CARG2, TMP1, -4
@@ -3593,41 +3613,58 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    addi TAB:RB, CARG2, LO
     |    ld4s TAB:RB, TAB:RB
     |  addi AT, zero, LJ_TTAB
-    |   //ldc1 f0, 0(CARG3)
+    |   ld AT2, CARG3
     |  add RA, BASE, RA
     |  cmpne AT, TMP1, AT
     |  bnez AT, ->vmeta_tgetv
-    |  cmpltui AT, TMP2, LJ_TISNUM
-    |  addi AT, zero, LJ_TSTR
+    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |  cmpltu AT, TMP2, AT
+    |  addi AT1, zero, LJ_TSTR
     |  beqz AT, >5
     |
     |  // Convert number key to integer, check for integerness and range.
-    |  //cvt.w.d f2, f0
+    |  move CROSSTMP1, CARG2 // CARG2/3's live range are across the following C call
+    |  move CROSSTMP2, CARG3
+    |  move CARG1, AT2
+    |  move CROSSTMP3, AT2
+    |  load_got __fixdfsi
+    |  call_intern __fixdfsi
+    |  move CARG2, CROSSTMP1
+    |  move CARG3, CROSSTMP2
+    |  move CRET2, CRET1
     |   addlo TMP0, TAB:RB->asize
-    |   ld TMP0, TMP0
-    |  //mfc1 TMP2, f2
-    |  //cvt.d.w f4, f2
+    |   ld4u TMP0, TMP0
+    |   cmpltsi AT, CRET1, 0
+    |   sub AT1, zero, CRET1
+    |   moveli AT3, 539
+    |   cmovnez CRET1, AT, AT1
+    |   shli AT3, AT3, 8
+    |   shli AT1, CRET1, 4
+    |   bfins AT3, AT, 20, 20
+    |   fdouble_pack1 CRET1, AT1, AT3
+    |   fdouble_pack1 CRET1, AT1, zero
     |   addlo TMP1, TAB:RB->array
-    |   ld TMP1, TMP1
-    |  //c.eq.d f0, f4
-    |  cmpltu AT, TMP2, TMP0
-    |  //movf AT, r0
-    |   shli TMP2, TMP2, 3
-    |  add TMP2, TMP1, TMP2
+    |   ld4u TMP1, TMP1
+    |  cmpeq AT1, CRET1, CROSSTMP3
+    |  cmpltu AT, CRET2, TMP0
+    |  cmoveqz AT, AT1, zero
+    |   shli CRET2, CRET2, 3
+    |  add CRET2, TMP1, CRET2
     |  beqz AT, ->vmeta_tgetv		// Integer key and in array part?
-    |  addi TMP0, TMP2, HI
+    |  addi TMP0, CRET2, HI
     |  ld4s TMP0, TMP0
-    |  //ldc1 f0, 0(TMP2)
+    |  ld AT2, CRET2
     |  cmpeq AT, TMP0, TISNIL
     |  bnez AT, >2
     |1:
     |  ins_next1
-    |   //sdc1 f0, 0(RA)
+    |   st RA, AT2
     |  ins_next2
     |
     |2:  // Check for __index if table value is nil.
     |  addlo TAB:TMP2, TAB:RB->metatable
-    |  ld TAB:TMP2, TAB:TMP2
+    |  ld4u TAB:TMP2, TAB:TMP2
     |  beqz TAB:TMP2, <1		// No metatable: done.
     |  addlo TMP0, TAB:TMP2->nomm
     |  ld1u TMP0, TMP0
@@ -3638,7 +3675,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |5:
     |  addi AT, CARG3, LO
     |  ld4s STR:RC, AT
-    |  cmpne AT, TMP2, AT
+    |  cmpne AT, TMP2, AT1
     |  bnez AT, ->vmeta_tgetv
     |  b ->BC_TGETS_Z			// String key?
     break;
@@ -3730,25 +3767,25 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpne AT, CARG1, AT
     |  bnez AT, ->vmeta_tgetb
     |  addlo TMP1, TAB:RB->asize
-    |  ld TMP1, TMP1
+    |  ld4u TMP1, TMP1
     |   addlo TMP2, TAB:RB->array
-    |   ld TMP2, TMP2
+    |   ld4u TMP2, TMP2
     |  cmpltu AT, TMP0, TMP1
     |  add RC, TMP2, RC
     |  beqz AT, ->vmeta_tgetb
     |  addi TMP1, RC, HI
     |  ld4s TMP1, TMP1
-    |  //ldc1 f0, 0(RC)
+    |  ld AT2, RC
     |  cmpeq AT, TMP1, TISNIL
     |  bnez AT, >5
     |1:
     |  ins_next1
-    |   //sdc1 f0, 0(RA)
+    |   st RA, AT2
     |  ins_next2
     |
     |5:  // Check for __index if table value is nil.
     |  addlo TAB:TMP2, TAB:RB->metatable
-    |  ld TAB:TMP2, TAB:TMP2
+    |  ld4u TAB:TMP2, TAB:TMP2
     |  beqz TAB:TMP2, <1		// No metatable: done.
     |  addlo AT, TAB:TMP2->nomm
     |  ld1u TMP1, AT
@@ -3771,45 +3808,63 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    addi TAB:RB, CARG2, LO
     |    ld4s TAB:RB, TAB:RB
     |  addi AT, zero, LJ_TTAB
-    |   //ldc1 f0, 0(CARG3)
+    |   ld AT2, CARG3
     |  add RA, BASE, RA
     |  cmpne AT, TMP1, AT
     |  bnez AT, ->vmeta_tsetv
-    |  cmpltui AT, TMP2, LJ_TISNUM
+    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |  cmpltu AT1, TMP2, AT
     |  addi AT, zero, LJ_TSTR
-    |  beqz AT, >5
+    |  beqz AT1, >5
     |
     |  // Convert number key to integer, check for integerness and range.
     |  //cvt.w.d f2, f0
+    |  move CROSSTMP1, CARG2 // CARG2/3's live range are across the following C call
+    |  move CROSSTMP2, CARG3
+    |  move CARG1, AT2
+    |  move CROSSTMP3, AT2
+    |  load_got __fixdfsi
+    |  call_intern __fixdfsi
+    |  move CARG2, CROSSTMP1
+    |  move CARG3, CROSSTMP2
+    |  move CRET2, CRET1
     |   addlo TMP0, TAB:RB->asize
-    |   ld TMP0, TMP0
-    |  //mfc1 TMP2, f2
-    |  //cvt.d.w f4, f2
+    |   ld4u TMP0, TMP0
+    |   cmpltsi AT, CRET1, 0
+    |   sub AT1, zero, CRET1
+    |   moveli AT3, 539
+    |   cmovnez CRET1, AT, AT1
+    |   shli AT3, AT3, 8
+    |   shli AT1, CRET1, 4
+    |   bfins AT3, AT, 20, 20
+    |   fdouble_pack1 CRET1, AT1, AT3
+    |   fdouble_pack1 CRET1, AT1, zero
     |   addlo TMP1, TAB:RB->array
-    |   ld TMP1, TMP1
-    |  //c.eq.d f0, f4
+    |   ld4u TMP1, TMP1
+    |  cmpeq AT1, CRET1, CROSSTMP3
     |  cmpltu AT, TMP2, TMP0
-    |  //movf AT, r0
-    |   shli TMP2, TMP2, 3
-    |  add TMP1, TMP1, TMP2
+    |  cmoveqz AT, AT1, zero
+    |   shli CRET2, CRET2, 3
+    |  add TMP1, TMP1, CRET2
     |  beqz AT, ->vmeta_tsetv		// Integer key and in array part?
     |   addlo AT, TAB:RB->marked
     |   ld1u TMP3, AT
-    |  addi AT, TMP1, HI
-    |  ld4s TMP0, AT
-    |  //ldc1 f0, 0(RA)
+    |  addi TMP0, TMP1, HI
+    |  ld4s TMP0, TMP0
+    |  ld AT2, RA
     |  cmpeq AT, TMP0, TISNIL
     |  bnez AT, >3
     |1:
     |   andi AT, TMP3, LJ_GC_BLACK	// isblack(table)
-    |  //sdc1 f0, 0(TMP1)
+    |   st TMP1, AT2
     |   bnez AT, >7
     |2:
     |  ins_next
     |
     |3:  // Check for __newindex if previous value is nil.
     |  addlo TAB:TMP2, TAB:RB->metatable
-    |  ld TAB:TMP2, TAB:TMP2
+    |  ld4u TAB:TMP2, TAB:TMP2
     |  beqz TAB:TMP2, <1		// No metatable: done.
     |  addlo TMP2, TAB:TMP2->nomm
     |  ld1u TMP2, TMP2
@@ -3818,8 +3873,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  b ->vmeta_tsetv
     |
     |5:
-    |  addi AT, CARG3, LO
-    |  ld4s STR:RC, AT
+    |  addi STR:RC, CARG3, LO
+    |  ld4s STR:RC, STR:RC
     |  cmpne AT, TMP2, AT
     |  bnez AT, ->vmeta_tsetv
     |  b ->BC_TSETS_Z			// String key?
@@ -3950,9 +4005,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpne AT, CARG1, AT
     |  bnez AT, ->vmeta_tsetb
     |  addlo TMP1, TAB:RB->asize
-    |  ld TMP1, TMP1
+    |  ld4u TMP1, TMP1
     |   addlo TMP2, TAB:RB->array
-    |   ld TMP2, TMP2
+    |   ld4u TMP2, TMP2
     |  cmpltu AT, TMP0, TMP1
     |  add RC, TMP2, RC
     |  beqz AT, ->vmeta_tsetb
@@ -3960,19 +4015,19 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s TMP1, TMP1
     |   addlo TMP3, TAB:RB->marked
     |   ld1u TMP3, TMP3
-    |  //ldc1 f0, 0(RA)
+    |  ld AT2, RA
     |  cmpeq AT, TMP1, TISNIL
     |  bnez AT, >5
     |1:
     |  andi AT, TMP3, LJ_GC_BLACK	// isblack(table)
-    |  //sdc1 f0, 0(RC)
+    |  st RC, AT2
     |  bnez AT, >7
     |2:
     |  ins_next
     |
     |5:  // Check for __newindex if previous value is nil.
     |  addlo TAB:TMP2, TAB:RB->metatable
-    |  ld TAB:TMP2, TAB:TMP2
+    |  ld4u TAB:TMP2, TAB:TMP2
     |  beqz TAB:TMP2, <1		// No metatable: done.
     |  addlo TMP1, TAB:TMP2->nomm
     |  ld1u TMP1, TMP1
@@ -3998,22 +4053,22 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    beqz TMP0, >4			// Nothing to copy?
     |  add CARG3, CARG3, TMP3
     |  addlo TMP2, TAB:CARG2->asize
-    |  ld TMP2, TMP2
+    |  ld4u TMP2, TMP2
     |   shli TMP1, TMP3, 3
     |    addlo TMP3, TAB:CARG2->marked
     |    ld1u TMP3, TMP3
     |   addlo CARG1, TAB:CARG2->array
-    |   ld CARG1, CARG1
+    |   ld4u CARG1, CARG1
     |  cmpltu AT, TMP2, CARG3
     |  add TMP2, RA, TMP0
     |  bnez AT, >5
     |   add TMP1, TMP1, CARG1
     |  andi TMP0, TMP3, LJ_GC_BLACK	// isblack(table)
     |3:  // Copy result slots to table.
-    |   //ldc1 f0, 0(RA)
+    |   ld AT2, RA
     |    addli RA, RA, 8
     |  cmpltu AT, RA, TMP2
-    |   //sdc1 f0, 0(TMP1)
+    |   st TMP1, AT2
     |   addli TMP1, TMP1, 8
     |  bnez AT, <3
     |  bnez TMP0, >7
@@ -4031,8 +4086,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  call_intern lj_tab_reasize	// (lua_State *L, GCtab *t, int nasize)
     |  // Must not reallocate the stack.
     |  move RD, BASE
-    |  addlo AT, L:LREG->base	// Reload BASE for lack of a saved register.
-    |  ld BASE, AT	// Reload BASE for lack of a saved register.
+    |  addlo BASE, L:LREG->base	// Reload BASE for lack of a saved register.
+    |  ld BASE, BASE	// Reload BASE for lack of a saved register.
     |  b <1
     |
     |7:  // Possible table write barrier for any value. Skip valiswhite check.
