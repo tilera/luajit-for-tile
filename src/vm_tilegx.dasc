@@ -3834,7 +3834,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  beqz AT1, >5
     |
     |  // Convert number key to integer, check for integerness and range.
-    |  //cvt.w.d f2, f0
     |  move CROSSTMP1, CARG2 // CARG2/3's live range are across the following C call
     |  move CROSSTMP2, CARG3
     |  move CARG1, AT2
@@ -4169,10 +4168,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  move TMP3, NARGS8:RC
     |  beqz NARGS8:RC, >3
     |2:
-    |   //ldc1 f0, 0(RA)
+    |   ld AT2, RA
     |    addli RA, RA, 8
     |  addli TMP3, TMP3, -8
-    |   //sdc1 f0, 0(TMP2)
+    |   st TMP2, AT2
     |   addli TMP2, TMP2, 8
     |  bnez TMP3, <2
     |3:
@@ -4210,22 +4209,26 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  // RA = base*8, (RB = (nresults+1)*8, RC = (nargs+1)*8 ((2+1)*8))
     |  move TMP2, BASE
     |  add BASE, BASE, RA
-    |   addi AT, zero, LJ_TFUNC
+    |   addi AT1, zero, LJ_TFUNC
     |  addi TMP1, BASE, -24+HI
     |  ld4s TMP1, TMP1
     |   addi LFUNC:RB, BASE, -24+LO
     |   ld4s LFUNC:RB, LFUNC:RB
-    |    //ldc1 f2, -8(BASE)
-    |    //ldc1 f0, -16(BASE)
+    |    add AT2, BASE, -8
+    |    ld AT2, AT2
+    |    add AT3, BASE, -16
+    |    ld AT3, AT3
     |  addi AT, BASE, HI
     |  st4 AT, TMP1
     |   addi AT, BASE, LO
     |   st4 AT, LFUNC:RB
-    |    //sdc1 f2, 16(BASE)		// Copy control var.
-    |    //sdc1 f0, 8(BASE)		// Copy state.
+    |   addi AT, BASE, 16
+    |    st AT, AT2
+    |   addi AT, BASE, 8
+    |    st AT, AT3
     |   addli BASE, BASE, 8
     |  addi NARGS8:RC, zero, 16		// Iterators get 2 arguments.
-    |  cmpne AT, TMP1, AT
+    |  cmpne AT, TMP1, AT1
     |  bnez AT, ->vmeta_call
     |  ins_call
     break;
@@ -4241,9 +4244,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addi RC, RA, -8+LO
     |  ld4s RC, RC
     |  addlo TMP0, TAB:RB->asize
-    |  ld TMP0, TMP0
+    |  ld4u TMP0, TMP0
     |  addlo TMP1, TAB:RB->array
-    |  ld TMP1, TMP1
+    |  ld4u TMP1, TMP1
     |   addli PC, PC, 4
     |1:  // Traverse array part.
     |  cmpltu AT, RC, TMP0
@@ -4252,32 +4255,41 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add TMP3, TMP1, TMP3
     |  addi TMP2, TMP3, HI
     |  ld4s TMP2, TMP2
-    |   //ldc1 f0, 0(TMP3)
-    |    //mtc1 RC, f2
+    |   ld AT2, TMP3
+    |    move AT3, RC
     |     addi RD, PC, -4+OFS_RD
     |     ld2u RD, RD
     |  addli RC, RC, 1
     |  cmpeq AT, TMP2, TISNIL
     |  bnez AT, <1		// Skip holes in array part.
-    |    //cvt.d.w f2, f2
+    |   cmpltsi AT, AT3, 0
+    |   sub AT1, zero, AT3
+    |   moveli AT4, 539
+    |   cmovnez AT3, AT, AT1
+    |   shli AT4, AT4, 8
+    |   shli AT1, AT3, 4
+    |   bfins AT4, AT, 20, 20
+    |   fdouble_pack1 AT3, AT1, AT4
+    |   fdouble_pack1 AT3, AT1, zero
     |     moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
     |     shl16insli TMP3, TMP3, 0
-    |   //sdc1 f0, 8(RA)
+    |   addi AT, RA, 8
+    |   st AT, AT2
     |     decode_RD4b RD
     |     add RD, RD, TMP3
     |   addi AT, RA, -8+LO
     |   st4 AT, RC
     |     add PC, PC, RD
-    |    //sdc1 f2, 0(RA)
+    |    st RA, AT3
     |3:
     |  ins_next
     |
     |5:  // Traverse hash part.
     |  addlo TMP1, TAB:RB->hmask
-    |  ld TMP1, TMP1
+    |  ld4u TMP1, TMP1
     |  sub RC, RC, TMP0
     |   addlo TMP2, TAB:RB->node
-    |   ld TMP2, TMP2
+    |   ld4u TMP2, TMP2
     |6:
     |  cmpltu AT, TMP1, RC		// End of iteration? Branch to ITERL+1.
     |  shli TMP3, RC, 5
@@ -4287,20 +4299,22 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add NODE:TMP3, TMP3, TMP2
     |  addi RB, NODE:TMP3, HI
     |  ld4s RB, RB
-    |  //ldc1 f0, 0(NODE:TMP3)
+    |  ld AT2, NODE:TMP3
     |     addi RD, PC, -4+OFS_RD
     |     ld2u RD, RD
     |  addli RC, RC, 1
     |  cmpeq AT, RB, TISNIL
     |  bnez AT, <6		// Skip holes in hash part.
-    |   //ldc1 f2, NODE:TMP3->key
+    |   addlo AT3, NODE:TMP3->key
+    |   ld AT3, AT3
     |     moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
     |     shl16insli TMP3, TMP3, 0
-    |  //sdc1 f0, 8(RA)
+    |  addi AT, RA, 8
+    |  st AT, AT2
     |    add RC, RC, TMP0
     |     decode_RD4b RD
     |     add RD, RD, TMP3
-    |   //sdc1 f2, 0(RA)
+    |   st RA, AT3
     |     add PC, PC, RD
     |  addi AT, RA, -8+LO
     |  st4 AT, RC
@@ -4334,9 +4348,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  shl16insli TMP2, TMP2, 0
     |  bnez TMP1, >5
     |  add PC, TMP0, TMP2
-    |  //lui TMP1, 0xfffe
-    |  addli AT, zero, 0x7fff
-    |  or TMP1, TMP1, AT
+    |  moveli TMP1, -2
+    |  shl16insli TMP1, TMP1, 0x7fff
     |  addi AT, RA, -8+LO
     |  st4 AT, zero
     |  addi AT, RA, -8+HI
@@ -4399,9 +4412,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addli MULTRES, TMP1, 8
     |  bnez AT, >7
     |6:
-    |  //ldc1 f0, 0(RC)
+    |  ld AT2, RC
     |   addli RC, RC, 8
-    |  //sdc1 f0, 0(RA)
+    |  st RA, AT2
     |  cmpltu AT, RC, TMP3
     |  addli RA, RA, 8
     |  bnez AT, <6			// More vararg slots?
