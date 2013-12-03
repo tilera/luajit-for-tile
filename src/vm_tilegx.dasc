@@ -763,10 +763,17 @@ static void build_subroutines(BuildCtx *ctx)
   |  b >1
   |
   |->vmeta_tgetb:			// TMP0 = index
-  |  //mtc1 TMP0, f0
-  |  //cvt.d.w f0, f0
+  |   cmpltsi AT, TMP0, 0
+  |   sub AT1, zero, TMP0
+  |   moveli AT2, 539
+  |   cmovnez TMP0, AT, AT1
+  |   shli AT2, AT2, 8
+  |   shli AT1, TMP0, 4
+  |   bfins AT2, AT, 20, 20
+  |   fdouble_pack1 TMP0, AT1, AT2
+  |   fdouble_pack1 TMP0, AT1, zero
   |  addli CARG3, DISPATCH, DISPATCH_GL(tmptv)
-  |  //sdc1 f0, 0(CARG3)
+  |  st CARG3, TMP0
   |
   |->vmeta_tgetv:
   |1:
@@ -823,10 +830,18 @@ static void build_subroutines(BuildCtx *ctx)
   |  b >1
   |
   |->vmeta_tsetb:			// TMP0 = index
-  |  //mtc1 TMP0, f0
   |  //cvt.d.w f0, f0
+  |   cmpltsi AT, TMP0, 0
+  |   sub AT1, zero, TMP0
+  |   moveli AT2, 539
+  |   cmovnez TMP0, AT, AT1
+  |   shli AT2, AT2, 8
+  |   shli AT1, TMP0, 4
+  |   bfins AT2, AT, 20, 20
+  |   fdouble_pack1 TMP0, AT1, AT2
+  |   fdouble_pack1 TMP0, AT1, zero
   |  addli CARG3, DISPATCH, DISPATCH_GL(tmptv)
-  |  //sdc1 f0, 0(CARG3)
+  |  st CARG3, TMP0
   |
   |->vmeta_tsetv:
   |1:
@@ -3348,7 +3363,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   shrui RD, RD, 1
     |   add RD, RD, LFUNC:RB
     |  addlo UPVAL:RB, LFUNC:RD->uvptr
-    |  ld UPVAL:RB, UPVAL:RB
+    |  ld4u UPVAL:RB, UPVAL:RB
     |  ins_next1
     |  addlo TMP1, UPVAL:RB->v
     |  ld4u TMP1, TMP1
@@ -3366,7 +3381,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    add RA, RA, LFUNC:RB
     |   ld AT2, RD
     |  addlo UPVAL:RB, LFUNC:RA->uvptr
-    |  ld UPVAL:RB, UPVAL:RB
+    |  ld4u UPVAL:RB, UPVAL:RB
     |  addlo TMP3, UPVAL:RB->marked
     |  ld1u TMP3, TMP3
     |   addlo CARG2, UPVAL:RB->v
@@ -3409,7 +3424,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    add RA, RA, LFUNC:RB
     |   sub TMP1, KBASE, TMP1
     |  addlo UPVAL:RB, LFUNC:RA->uvptr
-    |  ld UPVAL:RB, UPVAL:RB
+    |  ld4u UPVAL:RB, UPVAL:RB
     |   addi STR:TMP1, TMP1, -4
     |   ld4u STR:TMP1, STR:TMP1
     |  addlo TMP2, UPVAL:RB->marked
@@ -3449,7 +3464,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   add RA, RA, LFUNC:RB
     |    ld AT2, RD
     |  addlo UPVAL:RB, LFUNC:RA->uvptr
-    |  ld UPVAL:RB, UPVAL:RB
+    |  ld4u UPVAL:RB, UPVAL:RB
     |  ins_next1
     |  addlo TMP1, UPVAL:RB->v
     |  ld4u TMP1, TMP1
@@ -3465,7 +3480,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   add RA, RA, LFUNC:RB
     |    nor TMP0, TMP0, zero
     |  addlo UPVAL:RB, LFUNC:RA->uvptr
-    |  ld UPVAL:RB, UPVAL:RB
+    |  ld4u UPVAL:RB, UPVAL:RB
     |  ins_next1
     |  addlo TMP1, UPVAL:RB->v
     |  ld4u TMP1, TMP1
@@ -4731,9 +4746,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  ins_next1
     }
     |2:
-    |  cmpltu AT, NARGS8:RC, TMP1		// Check for missing parameters.
+    |  cmpltu AT1, NARGS8:RC, TMP1		// Check for missing parameters.
     |  add AT, BASE, NARGS8:RC
-    |  bnez AT, >3
+    |  bnez AT1, >3
     if (op == BC_JFUNCF) {
       |  decode_RD8a RD, INS
       |  decode_RD8b RD
