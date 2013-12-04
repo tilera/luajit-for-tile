@@ -230,7 +230,7 @@ void dasm_put(Dst_DECL, int start, ...)
 	pl = D->pclabels + n; CKPL(pc, PC);
       putlabel:
 	n = *pl;  /* n > 0: Collapse rel chain and replace with label pos. */
-	while (n > 0) { int *pb = DASM_POS2PTR(D, n); n = *pb; *pb = pos;
+	while (n > 0) { long *pb = DASM_POS2PTR(D, n); n = (int)*pb; *pb = pos;
 	}
 	*pl = -pos;  /* Label exists now. */
 	b[pos++] = ofs;  /* Store pass1 offset estimate. */
@@ -271,7 +271,7 @@ int dasm_link(Dst_DECL, size_t *szp)
     for (idx = 20; idx*sizeof(int) < D->lgsize; idx++) {
       int n = D->lglabels[idx];
       /* Undefined label: Collapse rel chain and replace with marker (< 0). */
-      while (n > 0) { int *pb = DASM_POS2PTR(D, n); n = *pb; *pb = -idx; }
+      while (n > 0) { long *pb = DASM_POS2PTR(D, n); n = (int)*pb; *pb = -idx; }
     }
   }
 
