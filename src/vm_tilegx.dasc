@@ -81,10 +81,10 @@
 |.define SAVE_L,	144
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by interpreter.
 |.define TILE_ABI_RESERV,	32	// .. 32+14*8: 64 bit GPR saves.
+|.define SAVE_MULTRES,		24	
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
 |
-|.define SAVE_MULTRES,	ARG5
 |
 |.macro saveregs
 |  addi sp, sp, -40 // 8 + 32
@@ -406,8 +406,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  bnez AT, >6
   |
   |->vm_leave_cp:
-  |  addli AT, sp, SAVE_CFRAME
-  |  ld TMP0, AT		// Restore previous C frame.
+  |  addli TMP0, sp, SAVE_CFRAME
+  |  ld TMP0, TMP0		// Restore previous C frame.
   |   move CRET1, zero		// Ok return status for vm_pcall.
   |  addlo AT, L:LREG->cframe
   |  st AT, TMP0
@@ -538,11 +538,11 @@ static void build_subroutines(BuildCtx *ctx)
   |  // (lua_State *L, TValue *base, int nres1 = 0, ptrdiff_t ef = 0)
   |  saveregs
   |  move L, CARG1
-  |    addlo AT, L:LREG->glref		// Setup pointer to dispatch table.
-  |    ld4u DISPATCH, AT
+  |    addlo DISPATCH, L:LREG->glref		// Setup pointer to dispatch table.
+  |    ld4u DISPATCH, DISPATCH
   |  move BASE, CARG2
-  |    addlo AT, L:LREG->status
-  |    ld1u TMP1, AT
+  |    addlo TMP1, L:LREG->status
+  |    ld1u TMP1, TMP1
   |   addli AT, sp, SAVE_L
   |   st AT, L
   |  addi PC, zero, FRAME_CP
@@ -633,8 +633,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld4s TMP0, TMP0
   |  moveli AT, LJ_TFUNC
   |  cmpne AT1, TMP0, AT
-  |  addi TMP0, BASE, FRAME_FUNC
-  |  ld4s LFUNC:RB, TMP0
+  |  addi LFUNC:RB, BASE, FRAME_FUNC
+  |  ld4s LFUNC:RB, LFUNC:RB
   |  bnez AT1, ->vmeta_call
   |
   |->vm_call_dispatch_f:
@@ -853,11 +853,11 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CARG1, L
   |  call_intern lj_meta_tset		// (lua_State *L, TValue *o, TValue *k)
   |  // Returns TValue * (finished) or NULL (metamethod).
-  |  ld AT, RA
+  |  ld AT2, RA
   |  beqz CRET1, >3
   |  // NOBARRIER: lj_meta_tset ensures the table is not black.
   |  ins_next1
-  |   st CRET1, AT
+  |   st CRET1, AT2
   |  ins_next2
   |
   |3:  // Call __newindex metamethod.
@@ -870,7 +870,8 @@ static void build_subroutines(BuildCtx *ctx)
   |   sub PC, BASE, TMP1
   |  addi LFUNC:RB, BASE, FRAME_FUNC
   |  ld4s LFUNC:RB, LFUNC:RB
-  |  //sdc1 f0, 16(BASE)			// Copy value to third argument.
+  |  addi AT, BASE, 16
+  |  st AT, AT2
   |  addi NARGS8:RC, zero, 24			// 3 args for func(t, k, v)
   |  b ->vm_call_dispatch_f
   |
@@ -918,7 +919,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi TMP0, RA, HI
   |  ld4s TMP0, TMP0
   |  cmpltui AT, TMP0, LJ_TISTRUECOND
-  |  //negu TMP2, AT			// Branch if result is true.
+  |  sub TMP2, zero, AT
   |  b <4
   |
   |->cont_condf:			// RA = resultptr
@@ -2312,7 +2313,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  beqz AT, <5
   |1:
   |.  load_got lj_dispatch_ins
-  |   st MULTRES, SAVE_MULTRES
+  |   addi AT, sp, SAVE_MULTRES
+  |   st AT, MULTRES
   |  move CARG2, PC
   |   addlo AT, L->base
   |   st AT, BASE
@@ -2488,7 +2490,8 @@ static void build_subroutines(BuildCtx *ctx)
   |    //lui TMP3, 0x59c0			// TOBIT = 2^52 + 2^51 (float).
   |  shli MULTRES, CRET1, 3
   |    addi TISNIL, zero, LJ_TNIL
-  |  st MULTRES, SAVE_MULTRES
+  |   addi AT, sp, SAVE_MULTRES
+  |  st AT, MULTRES
   |    //mtc1 TMP3, TOBIT
   |  addlo TMP1, LFUNC:TMP1->pc
   |  ld4u TMP1, TMP1
