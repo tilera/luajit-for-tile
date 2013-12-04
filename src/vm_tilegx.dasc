@@ -3650,7 +3650,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  call_intern __fixdfsi
     |  move CARG2, CROSSTMP1
     |  move CARG3, CROSSTMP2
-    |  move CRET2, CRET1
+    |  move TMP3, CRET1
     |   addlo TMP0, TAB:RB->asize
     |   ld4u TMP0, TMP0
     |   cmpltsi AT, CRET1, 0
@@ -3664,15 +3664,17 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   fdouble_pack1 CRET1, AT1, zero
     |   addlo TMP1, TAB:RB->array
     |   ld4u TMP1, TMP1
-    |  cmpeq AT1, CRET1, CROSSTMP3
-    |  cmpltu AT, CRET2, TMP0
+    |  //cmpeq AT1, CRET1, CROSSTMP3
+    |  fdouble_add_flags AT1, CRET1, CROSSTMP3
+    |  bfextu AT1, AT1, 30, 30
+    |  cmpltu AT, TMP3, TMP0
     |  cmoveqz AT, AT1, zero
-    |   shli CRET2, CRET2, 3
-    |  add CRET2, TMP1, CRET2
+    |   shli TMP3, TMP3, 3
+    |  add TMP3, TMP1, TMP3
     |  beqz AT, ->vmeta_tgetv		// Integer key and in array part?
-    |  addi TMP0, CRET2, HI
+    |  addi TMP0, TMP3, HI
     |  ld4s TMP0, TMP0
-    |  ld AT2, CRET2
+    |  ld AT2, TMP3
     |  cmpeq AT, TMP0, TISNIL
     |  bnez AT, >2
     |1:
@@ -3691,8 +3693,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  b ->vmeta_tgetv
     |
     |5:
-    |  addi AT, CARG3, LO
-    |  ld4s STR:RC, AT
+    |  addi STR:RC, CARG3, LO
+    |  ld4s STR:RC, STR:RC
     |  cmpne AT, TMP2, AT1
     |  bnez AT, ->vmeta_tgetv
     |  b ->BC_TGETS_Z			// String key?
@@ -3845,7 +3847,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  call_intern __fixdfsi
     |  move CARG2, CROSSTMP1
     |  move CARG3, CROSSTMP2
-    |  move CRET2, CRET1
+    |  move TMP3, CRET1
     |   addlo TMP0, TAB:RB->asize
     |   ld4u TMP0, TMP0
     |   cmpltsi AT, CRET1, 0
@@ -3862,8 +3864,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpeq AT1, CRET1, CROSSTMP3
     |  cmpltu AT, TMP2, TMP0
     |  cmoveqz AT, AT1, zero
-    |   shli CRET2, CRET2, 3
-    |  add TMP1, TMP1, CRET2
+    |   shli TMP3, TMP3, 3
+    |  add TMP1, TMP1, TMP3
     |  beqz AT, ->vmeta_tsetv		// Integer key and in array part?
     |   addlo AT, TAB:RB->marked
     |   ld1u TMP3, AT
