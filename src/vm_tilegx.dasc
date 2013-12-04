@@ -1218,7 +1218,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi TMP0, NODE:TMP2, offsetof(Node, key)+LO
   |   ld4s TMP0, TMP0
   |    addlo NODE:TMP3, NODE:TMP2->next
-  |    ld NODE:TMP3, NODE:TMP3
+  |    ld4s NODE:TMP3, NODE:TMP3
   |    addi CARG2, NODE:TMP2, offsetof(Node, val)+HI
   |    ld4s CARG2, CARG2
   |  cmpne AT1, CARG4, AT
@@ -3940,19 +3940,19 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   ld4s TMP0, TMP0
     |  addi AT, zero, LJ_TSTR
     |    addlo NODE:TMP1, NODE:TMP2->next
-    |    ld4u NODE:TMP1, NODE:TMP1
+    |    ld4s NODE:TMP1, NODE:TMP1
     |   addli CARG2, NODE:TMP2, offsetof(Node, val)+HI
     |   ld4s CARG2, CARG2
-    |  cmpne AT, CARG1, AT
-    |  bnez AT, >5
+    |  cmpne AT1, CARG1, AT
+    |  bnez AT1, >5
     |    addlo TMP3, TAB:RB->marked
     |    ld1u TMP3, TMP3
-    |   cmpne AT, TMP0, STR:RC
-    |   bnez AT, >5
+    |   cmpne AT1, TMP0, STR:RC
+    |   bnez AT1, >5
     |    addlo TAB:TMP0, TAB:RB->metatable
     |    ld4u TAB:TMP0, TAB:TMP0
-    |    cmpeq AT, CARG2, TISNIL
-    |    bnez AT, >4		// Key found, but nil value?
+    |    cmpeq AT1, CARG2, TISNIL
+    |    bnez AT1, >4		// Key found, but nil value?
     |2:
     |  andi AT, TMP3, LJ_GC_BLACK	// isblack(table)
     |  addlo AT1, NODE:TMP2->val
