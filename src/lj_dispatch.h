@@ -35,7 +35,7 @@ extern void * __fixdfsi(void);
 #define GOTDEF(_) \
   _(floor) _(ceil) _(trunc) _(log) _(log10) _(exp) _(sin) _(cos) _(tan) \
   _(asin) _(acos) _(atan) _(sinh) _(cosh) _(tanh) _(frexp) _(modf) _(atan2) \
-  _(pow) _(fmod) _(ldexp) _(__divdf3) _(__fixdfsi)\
+  _(pow) _(fmod) _(ldexp) _(sqrt) _(__divdf3) _(__fixdfsi)\
   _(lj_dispatch_call) _(lj_dispatch_ins) _(lj_err_throw) \
   _(lj_ffh_coroutine_wrap_err) _(lj_func_closeuv) _(lj_func_newL_gc) \
   _(lj_gc_barrieruv) _(lj_gc_step) _(lj_gc_step_fixtop) _(lj_meta_arith) \

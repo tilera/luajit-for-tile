@@ -1111,9 +1111,20 @@ static void build_subroutines(BuildCtx *ctx)
   |->ff_ .. name:
   |  addi CARG3, BASE, HI
   |  ld4s CARG3, CARG3
-  |  //ldc1 FARG1, 0(BASE)
+  |  ld CARG1, BASE
   |  beqz NARGS8:RC, ->fff_fallback
-  |  cmpltui AT, CARG3, LJ_TISNUM
+  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu AT, CARG3, AT
+  |.if "name" == "math_abs"
+  |  bfextu  CRET1, CARG1, 0, 62
+  |.elif "name" == "math_sqrt"
+  |  load_got sqrt
+  |  call_intern sqrt
+  |.elif "name" == "math_rad"
+  |  addlo CARG2, CFUNC:RB->upvalue[0]
+  |  ld CARG2, CARG2
+  |.endif
   |  beqz AT, ->fff_fallback
   |.endmacro
   |
@@ -1122,13 +1133,16 @@ static void build_subroutines(BuildCtx *ctx)
   |  cmpltui AT, NARGS8:RC, 16
   |   addi CARG3, BASE, HI
   |   ld4s CARG3, CARG3
-  |  addi AT, BASE, 8+HI
-  |  ld4s CARG4, AT
+  |  addi CARG4, BASE, 8+HI
+  |  ld4s CARG4, CARG4
   |  bnez AT, ->fff_fallback
-  |  //ldc1 FARG1, 0(BASE)
-  |  //ldc1 FARG2, 8(BASE)
-  |  cmpltui TMP0, CARG3, LJ_TISNUM
-  |  cmpltui TMP1, CARG4, LJ_TISNUM
+  |  ld CARG1, BASE
+  |  addi AT3, BASE, 8
+  |  ld CARG2, AT3
+  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu TMP0, CARG3, AT
+  |  cmpltu TMP1, CARG4, AT
   |  and TMP0, TMP0, TMP1
   |  beqz TMP0, ->fff_fallback
   |.endmacro
@@ -1136,12 +1150,14 @@ static void build_subroutines(BuildCtx *ctx)
   |// Inlined GC threshold check. Caveat: uses TMP0 and TMP1 and has delay slot!
   |.macro ffgccheck
   |  addi TMP0, DISPATCH, DISPATCH_GL(gc.total)
-  |  ld TMP0, TMP0
+  |  ld4u TMP0, TMP0
   |  addi TMP1, DISPATCH, DISPATCH_GL(gc.threshold)
-  |  ld TMP1, TMP1
+  |  ld4u TMP1, TMP1
   |  sub AT, TMP0, TMP1
-  |  //FIXME
-  |  //bgezal AT, ->fff_gcstep
+  |  cmplts AT, zero, AT
+  |  beqz AT, >1
+  |  jal ->fff_gcstep
+  |  1:
   |.endmacro
   |
   |//-- Base library: checks -----------------------------------------------
@@ -1156,15 +1172,15 @@ static void build_subroutines(BuildCtx *ctx)
   |  add TMP2, RA, NARGS8:RC
   |   addi AT, RA, HI
   |   st4 AT, CARG3
-  |  addli TMP1, BASE, 8
+  |  addi TMP1, BASE, 8
   |  addi AT, RA, LO
   |  st4 AT, CARG1
   |  cmpeq AT, BASE, TMP2
   |  bnez AT, ->fff_res		// Done if exactly 1 argument.
   |1:
-  |  ld AT, TMP1
-  |  addi AT1, TMP1, -8
-  |  st AT1, AT
+  |  ld AT2, TMP1
+  |  addi AT, TMP1, -8
+  |  st AT, AT2
   |  addli TMP1, TMP1, 8
   |  cmpne AT, TMP1, TMP2
   |  bnez AT, <1
@@ -1173,39 +1189,40 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc type
   |  addi CARG3, BASE, HI
   |  ld4s CARG3, CARG3
-  |  addi TMP1, zero, LJ_TISNUM
-  |  cmpltui TMP0, CARG3, LJ_TISNUM
+  |  moveli TMP1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli TMP1, TMP1, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu TMP0, CARG3, TMP1
   |  beqz NARGS8:RC, ->fff_fallback
   |  cmoveqz TMP1, TMP0, CARG3
   |  nor TMP1, TMP1, zero
   |  shli TMP1, TMP1, 3
   |  add TMP1, CFUNC:RB, TMP1
-  |  addlo AT2, CFUNC:TMP1->upvalue
-  |  ld AT2, AT2
+  |  addlo CRET1, CFUNC:TMP1->upvalue
+  |  ld CRET1, CRET1
   |  b ->fff_resn
   |
   |//-- Base library: getters and setters ---------------------------------
   |
   |.ffunc_1 getmetatable
-  |  addi AT, zero, LJ_TTAB
+  |  addi AT1, zero, LJ_TTAB
   |  addi AT, zero, LJ_TUDATA
-  |  cmpne AT1, CARG3, AT
+  |  cmpne AT1, CARG3, AT1
   |  bnez AT1, >6
   |1:  // Field metatable must be at same offset for GCtab and GCudata!
   |  addlo TAB:CARG1, TAB:CARG1->metatable
-  |  ld TAB:CARG1, TAB:CARG1
+  |  ld4u TAB:CARG1, TAB:CARG1
   |2:
   |  addi STR:RC, DISPATCH, DISPATCH_GL(gcroot[GCROOT_MMNAME+MM_metatable])
-  |  ld STR:RC, STR:RC
+  |  ld4u STR:RC, STR:RC
   |  addi CARG3, zero, LJ_TNIL
   |  beqz TAB:CARG1, ->fff_restv
   |  addlo TMP0, TAB:CARG1->hmask
-  |  ld TMP0, TMP0
+  |  ld4u TMP0, TMP0
   |   addi CARG3, zero, LJ_TTAB			// Use metatable as default result.
   |  addlo TMP1, STR:RC->hash
-  |  ld TMP1, TMP1
+  |  ld4u TMP1, TMP1
   |  addlo NODE:TMP2, TAB:CARG1->node
-  |  ld NODE:TMP2, NODE:TMP2
+  |  ld4u NODE:TMP2, NODE:TMP2
   |  and TMP1, TMP1, TMP0		// idx = str->hash & tab->hmask
   |  shli TMP0, TMP1, 5
   |  shli TMP1, TMP1, 3
@@ -1239,26 +1256,29 @@ static void build_subroutines(BuildCtx *ctx)
   |  b ->fff_restv
   |
   |6:
-  |  cmpltui TMP0, CARG3, LJ_TISNUM
+  |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu TMP0, CARG3, AT1
   |  cmpeq AT1, CARG3, AT
   |  bnez AT1, <1
-  |  addi TMP1, zero, LJ_TISNUM
+  |  moveli TMP1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli TMP1, TMP1, (short)(LJ_TISNUM & 0xFFFF)
   |  cmoveqz TMP1, TMP0, CARG3
   |  nor TMP1, TMP1, zero
   |  shli TMP1, TMP1, 2
   |  add TMP1, DISPATCH, TMP1
-  |  addi AT, TMP1, DISPATCH_GL(gcroot[GCROOT_BASEMT])
-  |  ld TAB:CARG1, AT
+  |  addi TAB:CARG1, TMP1, DISPATCH_GL(gcroot[GCROOT_BASEMT])
+  |  ld TAB:CARG1, TAB:CARG1
   |  b <2
   |
   |.ffunc_2 setmetatable
   |  // Fast path: no mt for table yet and not clearing the mt.
   |  addi AT, zero, LJ_TTAB
   |  addli CARG4, CARG4, -LJ_TTAB
-  |  cmpne AT1, CARG3, AT
-  |  bnez AT1, ->fff_fallback
+  |  cmpne AT, CARG3, AT
+  |  bnez AT, ->fff_fallback
   |  addlo TAB:TMP1, TAB:CARG1->metatable
-  |  ld TAB:TMP1, TAB:TMP1
+  |  ld4u TAB:TMP1, TAB:TMP1
   |   addlo TMP3, TAB:CARG1->marked
   |   ld1u TMP3, TMP3
   |  or AT, CARG4, TAB:TMP1
@@ -1293,10 +1313,12 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi CARG1, BASE, HI
   |  ld4s CARG1, CARG1
   |  xori AT, NARGS8:RC, 8
-  |  cmpltui CARG1, CARG1, LJ_TISNUM
+  |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu CARG1, CARG1, AT1
   |  cmovnez CARG1, AT, zero
-  |  ld AT2, BASE
   |  beqz CARG1, ->fff_fallback		// Exactly one number argument.
+  |  ld CRET1, BASE
   |  b ->fff_resn
   |
   |.ffunc_1 tostring
@@ -1305,10 +1327,12 @@ static void build_subroutines(BuildCtx *ctx)
   |  // A __tostring method in the string base metatable is ignored.
   |  // Handle numbers inline, unless a number base metatable is present.
   |  addi TMP1, DISPATCH, DISPATCH_GL(gcroot[GCROOT_BASEMT_NUM])
-  |  ld TMP1, TMP1
-  |  cmpeq AT1, CARG3, AT
-  |  bnez AT1, ->fff_restv			// String key?
-  |  cmpltui TMP0, CARG3, LJ_TISNUM
+  |  ld4u TMP1, TMP1
+  |  cmpeq AT, CARG3, AT
+  |  bnez AT, ->fff_restv			// String key?
+  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu TMP0, CARG3, AT
   |  cmpltui TMP1, TMP1, 1
   |  and TMP0, TMP0, TMP1
   |  addlo AT, L:LREG->base			// Add frame since C call can throw.
@@ -1323,7 +1347,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  call_intern lj_str_fromnum		// (lua_State *L, lua_Number *np)
   |  // Returns GCstr *.
   |  addi CARG3, zero, LJ_TSTR
-  |  move CARG1, CRET1
+  |  //move CARG1, CRET1
   |  b ->fff_restv
   |
   |//-- Base library: iterators -------------------------------------------
@@ -1338,8 +1362,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi AT, zero, LJ_TTAB
   |   addi AT1, TMP2, HI
   |   st4 AT1, TISNIL
-  |  addi AT1, BASE, FRAME_PC
-  |  ld4s PC, AT1
+  |  addi PC, BASE, FRAME_PC
+  |  ld4s PC, PC
   |  cmpne AT1, CARG1, AT
   |  bnez AT1, ->fff_fallback
   |  load_got lj_tab_next
@@ -1370,12 +1394,12 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi AT, zero, LJ_TTAB
   |  addi PC, BASE, FRAME_PC
   |  ld4s PC, PC
-  |  cmpne AT1, CARG3, AT
-  |  bnez AT1, ->fff_fallback
+  |  cmpne AT, CARG3, AT
+  |  bnez AT, ->fff_fallback
   |  addli RA, BASE, -8
 #if LJ_52
   |  addlo TAB:TMP2, TAB:CARG1->metatable
-  |  ld TAB:TMP2, TAB:TMP2
+  |  ld4u TAB:TMP2, TAB:TMP2
   |   addlo AT2, CFUNC:RB->upvalue[0]
   |   ld AT2, AT2
   |  bnez TAB:TMP2, ->fff_fallback
@@ -1397,44 +1421,70 @@ static void build_subroutines(BuildCtx *ctx)
   |    ld4s TAB:CARG1, TAB:CARG1
   |   addi CARG4, BASE, 8+HI
   |   ld4s CARG4, CARG4
-  |  //ldc1 FARG2, 8(BASE)
+  |  addi CARG2, BASE, 8
+  |  ld CARG2, CARG2
   |  bnez AT, ->fff_fallback
   |   addli CARG3, CARG3, -LJ_TTAB
   |  cmpltui AT, CARG4, LJ_TISNUM
-  |   addi TMP0, zero, 1
   |  cmovnez AT, CARG3, zero
-  |   //mtc1 TMP0, FARG1
   |  addi PC, BASE, FRAME_PC
   |  ld4s PC, PC
   |  beqz AT, ->fff_fallback
   |   //cvt.w.d FRET1, FARG2
+  |  move CROSSTMP1, CARG1
+  |  move CROSSTMP2, CARG2
+  |  move CROSSTMP3, CARG3
+  |  move CROSSTMP4, CARG4
+  |  move CARG1, CARG2
+  |  load_got __fixdfsi
+  |  call_intern __fixdfsi
+  |  move TMP2, CRET1
+  |  move CARG1, CROSSTMP1
+  |  move CARG2, CROSSTMP2
+  |  move CARG3, CROSSTMP3
+  |  move CARG4, CROSSTMP4
   |  //cvt.d.w FARG1, FARG1
+  |  addi TMP3, zero, 1
+  |  cmpltsi AT, TMP3, 0
+  |  sub AT1, zero, TMP3
+  |  moveli AT2, 539
+  |  cmovnez TMP3, AT, AT1
+  |  shli AT2, AT2, 8
+  |  shli AT1, TMP3, 4
+  |  bfins AT2, AT, 20, 20
+  |  fdouble_pack1 TMP3, AT1, AT2
+  |  fdouble_pack1 TMP3, AT1, zero
   |   addlo TMP0, TAB:CARG1->asize
-  |   ld TMP0, TMP0
+  |   ld4u TMP0, TMP0
   |   addlo TMP1, TAB:CARG1->array
-  |   ld TMP1, TMP1
-  |  //mfc1 TMP2, FRET1
+  |   ld4u TMP1, TMP1
   |   addli RA, BASE, -8
-  |  //add.d FARG2, FARG2, FARG1
+  |  //add.d CARG2, CARG2, TMP3
+  |  fdouble_add_flags AT, CARG2, TMP3
+  |  fdouble_unpack_min AT1, CARG2, TMP3
+  |  fdouble_unpack_max TMP3, CARG2, TMP3
+  |  fdouble_addsub TMP3, AT1, AT
+  |  fdouble_pack1 CARG2, TMP3, AT
+  |  fdouble_pack2 CARG2, TMP3, zero
   |  addli TMP2, TMP2, 1
   |  cmpltu AT, TMP2, TMP0
   |   shli TMP3, TMP2, 3
   |   add TMP3, TMP1, TMP3
-  |  //sdc1 FARG2, 0(RA)
+  |  st RA, CARG2
   |  beqz AT, >2			// Not in array part?
   |  addi TMP2, TMP3, HI
   |  ld4s TMP2, TMP2
-  |  //ldc1 f0, 0(TMP3)
+  |  ld AT2, TMP3
   |1:
   |  addi RD, zero, (0+1)*8
   |  cmpeq AT, TMP2, TISNIL
   |  bnez AT, ->fff_res	// End of iteration, return 0 results.
   |   addi RD, zero, (2+1)*8
-  |  //sdc1 f0, 8(RA)
+  |  st RA, AT2
   |  b ->fff_res
   |2:  // Check for empty hash part first. Otherwise call C function.
   |  addlo TMP0, TAB:CARG1->hmask
-  |  ld TMP0, TMP0
+  |  ld4u TMP0, TMP0
   |  load_got lj_tab_getinth
   |  addi RD, zero, (0+1)*8
   |  beqz TMP0, ->fff_res
@@ -1445,19 +1495,19 @@ static void build_subroutines(BuildCtx *ctx)
   |  beqz CRET1, ->fff_res
   |  addi TMP2, CRET1, HI
   |  ld4s TMP2, TMP2
-  |  //ldc1 f0, 0(CRET1)
+  |  ld AT2, CRET1
   |  b <1
   |
   |.ffunc_1 ipairs
   |  addi AT, zero, LJ_TTAB
-  |  addi AT1, BASE, FRAME_PC
-  |  ld4s PC, AT1
-  |  cmpne AT1, CARG3, AT
-  |  bnez AT1, ->fff_fallback
+  |  addi PC, BASE, FRAME_PC
+  |  ld4s PC, PC
+  |  cmpne AT, CARG3, AT
+  |  bnez AT, ->fff_fallback
   |  addli RA, BASE, -8
 #if LJ_52
   |  addlo TAB:TMP2, TAB:CARG1->metatable
-  |  ld TAB:TMP2, TAB:TMP2
+  |  ld4u TAB:TMP2, TAB:TMP2
   |   addlo AT2, CFUNC:RB->upvalue[0]
   |   ld AT2, AT2
   |  bnez TAB:TMP2, ->fff_fallback
@@ -1492,9 +1542,10 @@ static void build_subroutines(BuildCtx *ctx)
   |    cmpltui AT, NARGS8:RC, 16
   |  addi CARG4, BASE, 8+HI
   |  ld4s CARG4, CARG4
-  |  //ldc1 FARG2, 8(BASE)
+  |  addi AT2, BASE, 8
+  |  ld AT2, AT2
   |    bnez AT, ->fff_fallback
-  |   //ldc1 FARG1, 0(BASE)
+  |   ld AT3, BASE
   |    addi TMP1, DISPATCH, DISPATCH_GL(hookmask)
   |    ld1u TMP1, TMP1
   |  addi AT, zero, LJ_TFUNC
@@ -1504,9 +1555,10 @@ static void build_subroutines(BuildCtx *ctx)
   |   addli BASE, BASE, 16
   |  // Remember active hook before pcall.
   |  shli TMP3, TMP3, HOOK_ACTIVE_SHIFT
-  |   //sdc1 FARG2, 0(TMP2)		// Swap function and traceback.
+  |   st TMP2, AT2		// Swap function and traceback.
   |  andi TMP3, TMP3, 1
-  |   //sdc1 FARG1, 8(TMP2)
+  |   addi AT, TMP2, 8
+  |   st AT, AT3
   |  addli PC, TMP3, 16+FRAME_PCALL
   |  addli NARGS8:RC, NARGS8:RC, -16
   |  b ->vm_call_dispatch
@@ -1539,12 +1591,13 @@ static void build_subroutines(BuildCtx *ctx)
   |  bnez TMP1, ->fff_fallback		// cframe != 0?
   |  addlo TMP0, L:CARG1->maxstack
   |  ld4u TMP0, TMP0
-  |  addi AT1, BASE, FRAME_PC
-  |  ld4s PC, AT1
+  |  addi PC, BASE, FRAME_PC
+  |  ld4s PC, PC
   |  beqz AT, ->fff_fallback		// base == top && st == 0?
   |  add TMP2, CARG2, NARGS8:RC
   |  cmpltu AT, TMP0, TMP2
-  |  st sp, PC
+  |  addi AT1, sp, SAVE_PC
+  |  st AT1, PC
   |  bnez AT, ->fff_fallback		// Stack overflow?
   |   addlo AT, L->base
   |   st AT, BASE
@@ -1673,13 +1726,11 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Math library -------------------------------------------------------
   |
   |.ffunc_n math_abs
-  |//.  abs.d FRET1, FARG1
   |->fff_resn:
   |  addi PC, BASE, FRAME_PC
   |  ld4s PC, PC
   |  addli RA, BASE, -8
-  |  addi AT, BASE, -8
-  |  st AT, AT2
+  |  st RA, CRET1
   |  b ->fff_res1
   |
   |->fff_restv:
@@ -1758,7 +1809,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  bnez AT1, ->fff_fallback
   |  cmpltui AT, CARG3, LJ_TISNUM
   |  beqz AT, ->fff_fallback
-  |  ld AT2, BASE
+  |  ld CARG1, BASE
   |  call_extern
   |  b ->fff_resn
   |
@@ -1778,13 +1829,25 @@ static void build_subroutines(BuildCtx *ctx)
   |  math_extern2 fmod
   |
   |.ffunc_n math_sqrt
-  |//.  sqrt.d FRET1, FARG1
   |  b ->fff_resn
   |
   |->ff_math_deg:
   |.ffunc_n math_rad
-  |//.  ldc1 FARG2, CFUNC:RB->upvalue[0]
-  |//  mul.d FRET1, FARG1, FARG2
+  |  fdouble_unpack_max AT, CARG1, zero
+  |  fdouble_unpack_max AT1, CARG2, zero
+  |  fdouble_mul_flags CARG1, CARG1, CARG2
+  |  mul_hu_lu CARG2, AT, AT1
+  |  mul_lu_lu AT4, AT, AT1
+  |  mula_hu_lu CARG2, AT1, AT
+  |  mul_hu_hu AT, AT, AT1
+  |  shli AT5, CARG2, 32
+  |  shrui CARG2, CARG2, 32
+  |  add AT4, AT4, AT5
+  |  add CARG2, AT, CARG2
+  |  cmpltu AT5, AT4, AT5
+  |  add CARG2, CARG2, AT5
+  |  fdouble_pack1 CARG1, CARG2, CARG1
+  |  fdouble_pack2 CARG1, CARG2, AT4 // CARG1 is the same as CRET1
   |  b ->fff_resn
   |
   |.ffunc_nn math_ldexp
@@ -1861,7 +1924,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  cmpne AT, CARG3, AT
   |  bnez AT, ->fff_fallback
   |  addlo CRET1, STR:CARG1->len
-  |  ld CRET1, CRET1
+  |  ld4u CRET1, CRET1
   |  b ->fff_resi
   |
   |.ffunc string_byte			// Only handle the 1-arg case here.
@@ -2174,8 +2237,15 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc_bit tobit
   |->fff_resi:
-  |  //mtc1 CRET1, FRET1
-  |  //cvt.d.w FRET1, FRET1
+  |  cmpltsi AT, CRET1, 0
+  |  sub AT1, zero, CRET1
+  |  moveli AT2, 539
+  |  cmovnez CRET1, AT, AT1
+  |  shli AT2, AT2, 8
+  |  shli AT1, CRET1, 4
+  |  bfins AT2, AT, 20, 20
+  |  fdouble_pack1 CRET1, AT1, AT2
+  |  fdouble_pack2 CRET1, AT1, zero
   |  b ->fff_resn
   |
   |//-----------------------------------------------------------------------
