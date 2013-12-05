@@ -2406,8 +2406,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld1u TMP3, TMP3
   |  andi AT, TMP3, HOOK_VMEVENT	// No recording while in vmevent.
   |  // Decrement the hookcount for consistency, but always do the call.
-  |  addi AT, DISPATCH, DISPATCH_GL(hookcount)
-  |  ld TMP2, AT
+  |  addi TMP2, DISPATCH, DISPATCH_GL(hookcount)
+  |  ld4u TMP2, TMP2
   |  bnez AT, >5
   |  andi AT, TMP3, HOOK_ACTIVE
   |  addli TMP2, TMP2, -1
@@ -2425,15 +2425,15 @@ static void build_subroutines(BuildCtx *ctx)
   |  andi AT, TMP3, HOOK_ACTIVE		// Hook already active?
   |  beqz AT, >1
   |5:  // Re-dispatch to static ins.
-  |.  addi AT, TMP0, GG_DISP2STATIC
-  |.  ld AT, AT
+  |  addi AT, TMP0, GG_DISP2STATIC
+  |  ld AT, AT
   |  jr AT
   |
   |->vm_inshook:			// Dispatch target for instr/line hooks.
   |  addi TMP3, DISPATCH, DISPATCH_GL(hookmask)
   |  ld1u TMP3, TMP3
   |  addi TMP2, DISPATCH, DISPATCH_GL(hookcount)
-  |  ld TMP2, TMP2
+  |  ld4u TMP2, TMP2
   |  andi AT, TMP3, HOOK_ACTIVE		// Hook already active?
   |  andi AT, TMP3, LUA_MASKLINE|LUA_MASKCOUNT
   |  bnez AT, <5
@@ -2445,7 +2445,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  andi AT, TMP3, LUA_MASKLINE
   |  beqz AT, <5
   |1:
-  |.  load_got lj_dispatch_ins
+  |  load_got lj_dispatch_ins
   |   addi AT, sp, SAVE_MULTRES
   |   st AT, MULTRES
   |  move CARG2, PC
@@ -2459,7 +2459,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld BASE, BASE
   |4:  // Re-dispatch to static ins.
   |  addi INS, PC, -4
-  |  ld INS, INS
+  |  ld4u INS, INS
   |  decode_OP4a TMP1, INS
   |  decode_OP4b TMP1
   |  add TMP0, DISPATCH, TMP1
