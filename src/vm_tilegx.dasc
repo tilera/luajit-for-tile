@@ -3861,7 +3861,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   fdouble_pack1 CRET1, AT1, zero
     |   addlo TMP1, TAB:RB->array
     |   ld4u TMP1, TMP1
-    |  cmpeq AT1, CRET1, CROSSTMP3
+    |  //cmpeq AT1, CRET1, CROSSTMP3
+    |  fdouble_add_flags AT1, CRET1, CROSSTMP3
+    |  bfextu AT1, AT1, 30, 30
     |  cmpltu AT, TMP2, TMP0
     |  cmoveqz AT, AT1, zero
     |   shli TMP3, TMP3, 3
