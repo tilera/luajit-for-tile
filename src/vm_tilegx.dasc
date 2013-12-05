@@ -1118,9 +1118,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  cmpltu AT, CARG3, AT
   |.if "name" == "math_abs"
   |  bfextu  CRET1, CARG1, 0, 62
-  |.elif "name" == "math_sqrt"
-  |  load_got sqrt
-  |  call_intern sqrt
   |.elif "name" == "math_rad"
   |  addlo CARG2, CFUNC:RB->upvalue[0]
   |  ld CARG2, CARG2
@@ -1437,7 +1434,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CROSSTMP4, CARG4
   |  move CARG1, CARG2
   |  load_got __fixdfsi
-  |  call_intern __fixdfsi
+  |  call_extern
   |  move TMP2, CRET1
   |  move CARG1, CROSSTMP1
   |  move CARG2, CROSSTMP2
@@ -1569,12 +1566,12 @@ static void build_subroutines(BuildCtx *ctx)
   |.if resume
   |.ffunc_1 coroutine_resume
   |  addi AT, zero, LJ_TTHREAD
-  |  cmpne AT1, CARG3, AT
-  |  bnez AT1, ->fff_fallback
+  |  cmpne AT, CARG3, AT
+  |  bnez AT, ->fff_fallback
   |.else
   |.ffunc coroutine_wrap_aux
   |  addlo L:CARG1, CFUNC:RB->upvalue[0].gcr
-  |  ld L:CARG1, L:CARG1
+  |  ld4u L:CARG1, L:CARG1
   |.endif
   |  addlo TMP0, L:CARG1->status
   |  ld1u TMP0, TMP0
@@ -1777,16 +1774,18 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld4s CARG3, CARG3
   |  load_got func
   |  beqz NARGS8:RC, ->fff_fallback
-  |  cmpltui AT, CARG3, LJ_TISNUM
+  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu AT, CARG3, AT
   |  beqz AT, ->fff_fallback
-  |  ld AT2, BASE
+  |  ld CARG1, BASE
   |  call_extern
   |  b ->fff_resn
   |.endmacro
   |
   |.macro math_extern2, func
   |  .ffunc_nn math_ .. func
-  |.  load_got func
+  |  load_got func
   |  call_extern
   |  b ->fff_resn
   |.endmacro
@@ -1813,6 +1812,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  call_extern
   |  b ->fff_resn
   |
+  |  math_extern sqrt
   |  math_extern log10
   |  math_extern exp
   |  math_extern sin
@@ -1827,9 +1827,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  math_extern2 pow
   |  math_extern2 atan2
   |  math_extern2 fmod
-  |
-  |.ffunc_n math_sqrt
-  |  b ->fff_resn
   |
   |->ff_math_deg:
   |.ffunc_n math_rad
@@ -1851,9 +1848,13 @@ static void build_subroutines(BuildCtx *ctx)
   |  b ->fff_resn
   |
   |.ffunc_nn math_ldexp
-  |//  cvt.w.d FARG2, FARG2
+  |  move CROSSTMP1, CARG1
+  |  move CARG1, CARG2 
+  |  load_got __fixdfsi
+  |  call_extern
+  |  move CARG2, CRET1
+  |  move CARG1, CROSSTMP1
   |  load_got ldexp
-  |//  mfc1 CARG3, FARG2
   |  call_extern
   |  b ->fff_resn
   |
@@ -1861,15 +1862,23 @@ static void build_subroutines(BuildCtx *ctx)
   |  load_got frexp
   |   addi PC, BASE, FRAME_PC
   |   ld4s PC, PC
-  |  addli CARG3, DISPATCH, DISPATCH_GL(tmptv)
+  |  addli CARG2, DISPATCH, DISPATCH_GL(tmptv)
   |  call_extern
   |   addi TMP1, DISPATCH, DISPATCH_GL(tmptv)
   |   ld TMP1, TMP1
   |  addli RA, BASE, -8
-  |   //mtc1 TMP1, FARG2
-  |  //sdc1 FRET1, 0(RA)
-  |   //cvt.d.w FARG2, FARG2
-  |   //sdc1 FARG2, 8(RA)
+  |  st RA, CRET1
+  |   cmpltsi AT, TMP1, 0
+  |   sub AT1, zero, TMP1
+  |   moveli AT2, 539
+  |   cmovnez TMP1, AT, AT1
+  |   shli AT2, AT2, 8
+  |   shli AT1, TMP1, 4
+  |   bfins AT2, AT, 20, 20
+  |   fdouble_pack1 TMP1, AT1, AT2
+  |   fdouble_pack1 TMP1, AT1, zero
+  |   addi AT, RA, 8
+  |   st AT, TMP1
   |  addi RD, zero, (2+1)*8
   |  b ->fff_res
   |
@@ -1877,10 +1886,10 @@ static void build_subroutines(BuildCtx *ctx)
   |  load_got modf
   |   addi PC, BASE, FRAME_PC
   |   ld4s PC, PC
-  |  addli CARG3, BASE, -8
+  |  addli CARG2, BASE, -8
   |  call_extern
   |  addli RA, BASE, -8
-  |  //sdc1 FRET1, 0(BASE)
+  |  st BASE, CRET1
   |  addi RD, zero, (2+1)*8
   |  b ->fff_res
   |
@@ -1888,27 +1897,33 @@ static void build_subroutines(BuildCtx *ctx)
   |->ff_ .. name:
   |  addi CARG3, BASE, HI
   |  ld4s CARG3, CARG3
-  |  //ldc1 FRET1, 0(BASE)
+  |  ld CRET1, BASE
   |  beqz NARGS8:RC, ->fff_fallback
-  |  cmpltui AT, CARG3, LJ_TISNUM
+  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu AT, CARG3, AT
   |  add TMP2, BASE, NARGS8:RC
   |  beqz AT, ->fff_fallback
   |  addli TMP1, BASE, 8
   |  cmpeq AT, TMP1, TMP2
   |  bnez AT, ->fff_resn
   |1:
-  |.  addi CARG3, TMP1, HI
-  |.  ld4s CARG3, CARG3
-  |//  ldc1 FARG1, 0(TMP1)
+  |  addi CARG3, TMP1, HI
+  |  ld4s CARG3, CARG3
+  |  ld CARG2, TMP1
   |   addli TMP1, TMP1, 8
-  |  cmpltui AT, CARG3, LJ_TISNUM
+  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu AT, CARG3, AT
   |  beqz AT, ->fff_fallback
-  |//.if ismax
-  |//.  c.olt.d FARG1, FRET1
-  |//.else
-  |//.  c.olt.d FRET1, FARG1
-  |//.endif
-  |//  movf.d FRET1, FARG1
+  |.if ismax
+  |  fdouble_add_flags AT, CARG2, CRET1
+  |  bfextu AT, AT, 26, 26
+  |.else
+  |  fdouble_add_flags AT, CRET1, CARG2
+  |  bfextu AT, AT, 26, 26
+  |.endif
+  |  cmoveqz CRET1, AT, CARG2
   |  cmpne AT, TMP1, TMP2
   |  bnez AT, <1
   |  b ->fff_resn
@@ -3257,13 +3272,13 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  move CARG1, AT2
     |  move CARG2, AT3
     |  load_got __divdf3
-    |  call_intern __divdf3
+    |  call_extern
     |  move AT2, CRET1
     |.else
     |  move CARG1, AT2
     |  move CARG2, AT3
     |  load_got fmod
-    |  call_intern fmod
+    |  call_extern
     |  move AT2, CRET1
     |.endif
     |  ins_next1
@@ -3717,7 +3732,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  move CARG1, AT2
     |  move CROSSTMP3, AT2
     |  load_got __fixdfsi
-    |  call_intern __fixdfsi
+    |  call_extern
     |  move CARG2, CROSSTMP1
     |  move CARG3, CROSSTMP2
     |  move TMP3, CRET1
@@ -3914,7 +3929,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  move CARG1, AT2
     |  move CROSSTMP3, AT2
     |  load_got __fixdfsi
-    |  call_intern __fixdfsi
+    |  call_extern
     |  move CARG2, CROSSTMP1
     |  move CARG3, CROSSTMP2
     |  move TMP3, CRET1
