@@ -776,7 +776,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   shli AT1, TMP0, 4
   |   bfins AT2, AT, 20, 20
   |   fdouble_pack1 TMP0, AT1, AT2
-  |   fdouble_pack1 TMP0, AT1, zero
+  |   fdouble_pack2 TMP0, AT1, zero
   |  addli CARG3, DISPATCH, DISPATCH_GL(tmptv)
   |  st CARG3, TMP0
   |
@@ -844,7 +844,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   shli AT1, TMP0, 4
   |   bfins AT2, AT, 20, 20
   |   fdouble_pack1 TMP0, AT1, AT2
-  |   fdouble_pack1 TMP0, AT1, zero
+  |   fdouble_pack2 TMP0, AT1, zero
   |  addli CARG3, DISPATCH, DISPATCH_GL(tmptv)
   |  st CARG3, TMP0
   |
@@ -1457,7 +1457,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  shli AT1, TMP3, 4
   |  bfins AT2, AT, 20, 20
   |  fdouble_pack1 TMP3, AT1, AT2
-  |  fdouble_pack1 TMP3, AT1, zero
+  |  fdouble_pack2 TMP3, AT1, zero
   |   addlo TMP0, TAB:CARG1->asize
   |   ld4u TMP0, TMP0
   |   addlo TMP1, TAB:CARG1->array
@@ -1484,7 +1484,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  cmpeq AT, TMP2, TISNIL
   |  bnez AT, ->fff_res	// End of iteration, return 0 results.
   |   addi RD, zero, (2+1)*8
-  |  st RA, AT2
+  |  addi AT, RA, 8
+  |  st AT, AT2
   |  b ->fff_res
   |2:  // Check for empty hash part first. Otherwise call C function.
   |  addlo TMP0, TAB:CARG1->hmask
@@ -1885,7 +1886,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   shli AT1, TMP1, 4
   |   bfins AT2, AT, 20, 20
   |   fdouble_pack1 TMP1, AT1, AT2
-  |   fdouble_pack1 TMP1, AT1, zero
+  |   fdouble_pack2 TMP1, AT1, zero
   |   addi AT, RA, 8
   |   st AT, TMP1
   |  addi RD, zero, (2+1)*8
@@ -3803,7 +3804,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   shli AT1, CRET1, 4
     |   bfins AT3, AT, 20, 20
     |   fdouble_pack1 CRET1, AT1, AT3
-    |   fdouble_pack1 CRET1, AT1, zero
+    |   fdouble_pack2 CRET1, AT1, zero
     |   addlo TMP1, TAB:RB->array
     |   ld4u TMP1, TMP1
     |  //cmpeq AT1, CRET1, CROSSTMP3
@@ -4000,7 +4001,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   shli AT1, CRET1, 4
     |   bfins AT3, AT, 20, 20
     |   fdouble_pack1 CRET1, AT1, AT3
-    |   fdouble_pack1 CRET1, AT1, zero
+    |   fdouble_pack2 CRET1, AT1, zero
     |   addlo TMP1, TAB:RB->array
     |   ld4u TMP1, TMP1
     |  //cmpeq AT1, CRET1, CROSSTMP3
@@ -4419,7 +4420,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   shli AT1, AT3, 4
     |   bfins AT4, AT, 20, 20
     |   fdouble_pack1 AT3, AT1, AT4
-    |   fdouble_pack1 AT3, AT1, zero
+    |   fdouble_pack2 AT3, AT1, zero
     |     moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
     |     shl16insli TMP3, TMP3, 0
     |   addi AT, RA, 8
@@ -4836,8 +4837,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add RA, BASE, RA
     |  addi TMP1, RA, HI
     |  ld4s TMP1, TMP1
-    |  addi AT, RA, LO
-    |  ld4s TMP2, AT
+    |  addi TMP2, RA, LO
+    |  ld4s TMP2, TMP2
     |  cmpeq AT, TMP1, TISNIL
     |  bnez AT, >1		// Stop if iterator returned nil.
     if (op == BC_JITERL) {
