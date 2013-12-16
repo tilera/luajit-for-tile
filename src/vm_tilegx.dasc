@@ -2233,8 +2233,18 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.macro .ffunc_bit, name
   |  .ffunc_n bit_..name
-  |//.  add.d FARG1, FARG1, TOBIT
-  |//  mfc1 CRET1, FARG1
+  |  moveli AT, 17208 // 0x4338
+  |  shl16insli AT, AT, 0
+  |  shl16insli AT, AT, 0
+  |  shl16insli AT, AT, 0
+  |  //add.d FARG1, FARG1, TOBIT
+  |  fdouble_add_flags  AT1, CARG1, AT
+  |  fdouble_unpack_min AT2, CARG1, AT
+  |  fdouble_unpack_max AT,  CARG1, AT
+  |  fdouble_addsub AT, AT2, AT1
+  |  fdouble_pack1 CARG1, AT, AT1
+  |  fdouble_pack2 CARG1, AT, zero
+  |  bfextu AT5, CARG1, 0, 31
   |.endmacro
   |
   |.macro .ffunc_bit_op, name, ins
@@ -2244,7 +2254,7 @@ static void build_subroutines(BuildCtx *ctx)
   |1:
   |  addi CARG4, TMP1, HI
   |  ld4s CARG4, CARG4
-  |  //ldc1 FARG1, 0(TMP1)
+  |  ld CARG1, TMP1
   |  cmpeq AT, TMP1, TMP2
   |  bnez AT, ->fff_resi
   |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
@@ -2253,7 +2263,18 @@ static void build_subroutines(BuildCtx *ctx)
   |  beqz AT, ->fff_fallback
   |  //add.d FARG1, FARG1, TOBIT
   |  //mfc1 CARG2, FARG1
-  |  ins CRET1, CRET1, CARG2
+  |  moveli AT, 17208 // 0x4338
+  |  shl16insli AT, AT, 0
+  |  shl16insli AT, AT, 0
+  |  shl16insli AT, AT, 0
+  |  fdouble_add_flags  AT1, CARG1, AT
+  |  fdouble_unpack_min AT2, CARG1, AT
+  |  fdouble_unpack_max AT,  CARG1, AT
+  |  fdouble_addsub AT, AT2, AT1
+  |  fdouble_pack1 CARG1, AT, AT1
+  |  fdouble_pack2 CARG1, AT, zero
+  |  bfextu CARG2, CARG1, 0, 31
+  |  ins CRET1, AT5, CARG2
   |  addli TMP1, TMP1, 8
   |  b <1
   |.endmacro
@@ -2263,29 +2284,51 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_bit_op bxor, xor
   |
   |.ffunc_bit bswap
-  |  shrui TMP0, CRET1, 24
-  |   shrui TMP2, CRET1, 8
-  |  shli TMP1, CRET1, 24
-  |   //addli AT, zero, 0xff00
+  |  shrui TMP0, AT5, 24
+  |   shrui TMP2, AT5, 8
+  |  shli TMP1, AT5, 24
+  |   moveli AT, 255
+  |   shli AT, AT, 8
   |   and TMP2, TMP2, AT
   |  or TMP0, TMP0, TMP1
-  |   //addli AT, zero, 0xff00
-  |   and CRET1, CRET1, AT
+  |   and AT5, AT5, AT
   |  or TMP0, TMP0, TMP2
-  |   shli CRET1, CRET1, 8
-  |  or CRET1, TMP0, CRET1
+  |   shli AT5, AT5, 8
+  |  or CRET1, TMP0, AT5
   |  b ->fff_resi
   |
   |.ffunc_bit bnot
-  |  nor CRET1, CRET1, zero
+  |  nor CRET1, AT5, zero
   |  b ->fff_resi
   |
   |.macro .ffunc_bit_sh, name, ins, shmod
   |  .ffunc_nn bit_..name
-  |//.  add.d FARG1, FARG1, TOBIT
-  |//  add.d FARG2, FARG2, TOBIT
-  |//  mfc1 CARG1, FARG1
-  |//  mfc1 CARG2, FARG2
+  |  //add.d FARG1, FARG1, TOBIT
+  |  moveli AT, 17208 // 0x4338
+  |  shl16insli AT, AT, 0
+  |  shl16insli AT, AT, 0
+  |  shl16insli AT, AT, 0
+  |  fdouble_add_flags  AT1, CARG1, AT
+  |  fdouble_unpack_min AT2, CARG1, AT
+  |  fdouble_unpack_max AT,  CARG1, AT
+  |  fdouble_addsub AT, AT2, AT1
+  |  fdouble_pack1 CARG1, AT, AT1
+  |  fdouble_pack2 CARG1, AT, zero
+  |  //mfc1 CARG1, FARG1
+  |  bfextu AT5, CARG1, 0, 31
+  |  //add.d FARG2, FARG2, TOBIT
+  |  moveli AT, 17208 // 0x4338
+  |  shl16insli AT, AT, 0
+  |  shl16insli AT, AT, 0
+  |  shl16insli AT, AT, 0
+  |  fdouble_add_flags  AT1, CARG2, AT
+  |  fdouble_unpack_min AT2, CARG2, AT
+  |  fdouble_unpack_max AT,  CARG2, AT
+  |  fdouble_addsub AT, AT2, AT1
+  |  fdouble_pack1 CARG2, AT, AT1
+  |  fdouble_pack2 CARG2, AT, zero
+  |  //mfc1 CARG2, FARG2
+  |  bfextu AT4, CARG2, 0, 31
   |.if shmod == 1
   |  addi AT, zero, 32
   |  sub TMP0, AT, CARG2
@@ -2297,7 +2340,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  shru CARG2, CARG1, CARG2
   |  shl CARG1, CARG1, TMP0
   |.endif
-  |  ins CRET1, CARG1, CARG2
+  |  ins CRET1, AT5, AT4
   |  b ->fff_resi
   |.endmacro
   |
