@@ -1531,7 +1531,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   move TMP2, BASE
   |   addli BASE, BASE, 8
   |  // Remember active hook before pcall.
-  |  shli TMP3, TMP3, HOOK_ACTIVE_SHIFT
+  |  shrui TMP3, TMP3, HOOK_ACTIVE_SHIFT
   |  andi TMP3, TMP3, 1
   |  addli PC, TMP3, 8+FRAME_PCALL
   |  addli NARGS8:RC, NARGS8:RC, -8
@@ -1553,7 +1553,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  bnez AT1, ->fff_fallback  // Traceback must be a function.
   |   addli BASE, BASE, 16
   |  // Remember active hook before pcall.
-  |  shli TMP3, TMP3, HOOK_ACTIVE_SHIFT
+  |  shrui TMP3, TMP3, HOOK_ACTIVE_SHIFT
   |   st TMP2, AT2		// Swap function and traceback.
   |  andi TMP3, TMP3, 1
   |   addi AT, TMP2, 8
@@ -1695,7 +1695,7 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |9:  // Handle stack expansion on return from yield.
   |  load_got lj_state_growstack
-  |  shli CARG2, RD, 3
+  |  shrui CARG2, RD, 3
   |  move CARG1, L
   |  call_intern lj_state_growstack	// (lua_State *L, int n)
   |  move CRET1, zero
@@ -3920,7 +3920,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   addi TAB:RB, CARG2, LO
     |   ld4s TAB:RB, TAB:RB
     |   add RA, BASE, RA
-    |  shli TMP0, RC, 3
+    |  shrui TMP0, RC, 3
     |  cmpne AT, CARG1, AT
     |  bnez AT, ->vmeta_tgetb
     |  addlo TMP1, TAB:RB->asize
