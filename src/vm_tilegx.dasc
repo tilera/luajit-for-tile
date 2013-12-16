@@ -2038,6 +2038,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CROSSTMP1, CARG1
   |  move CROSSTMP2, CARG2
   |  move CROSSTMP2, CARG3
+  |  move MULTRES, AT3
   |  move CARG1, AT2
   |  load_got __fixdfsi
   |  call_extern
@@ -2045,6 +2046,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CARG1, CROSSTMP1
   |  move CARG2, CROSSTMP2
   |  move CARG3, CROSSTMP3
+  |  move AT3, MULTRES
   |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
   |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
   |  cmpltu AT, CARG3, AT
@@ -2056,11 +2058,13 @@ static void build_subroutines(BuildCtx *ctx)
   |  beqz AT1, ->fff_fallback
   |  //cvt.w.d f2, f2
   |  move CROSSTMP1, CARG1
+  |  move CROSSTMP2, CARG4
   |  move CARG1, AT3
   |  load_got __fixdfsi
   |  call_extern
   |  move CARG3, CRET1
   |  move CARG1, CROSSTMP1
+  |  move CARG4, CROSSTMP2
   |  addlo CARG2, STR:CARG1->len
   |  ld4u CARG2, CARG2
   |  addi AT, zero, LJ_TSTR
