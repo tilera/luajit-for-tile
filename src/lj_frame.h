@@ -151,13 +151,13 @@ enum {
 #define CFRAME_SIZE		112
 #define CFRAME_SHIFT_MULTRES	3
 #elif LJ_TARGET_TILEGX
-#define CFRAME_OFS_ERRF		168
-#define CFRAME_OFS_NRES		160
-#define CFRAME_OFS_PREV		152
-#define CFRAME_OFS_L		144
+#define CFRAME_OFS_ERRF		176
+#define CFRAME_OFS_NRES		168
+#define CFRAME_OFS_PREV		160
+#define CFRAME_OFS_L		152
 #define CFRAME_OFS_MULTRES	24
 #define CFRAME_OFS_PC		16
-#define CFRAME_SIZE		144
+#define CFRAME_SIZE		152
 #define CFRAME_SHIFT_MULTRES	3
 #else
 #error "Missing CFRAME_* definitions for this architecture"

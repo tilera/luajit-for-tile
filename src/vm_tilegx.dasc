@@ -32,6 +32,7 @@
 |.define CROSSTMP2,	r39
 |.define CROSSTMP3,	r40
 |.define CROSSTMP4,	r41
+|.define CROSSTMP5,	r42
 |
 |.define JGL,		r52	// On-trace: global_State + 32768.
 |
@@ -73,14 +74,14 @@
 |.define CRET2,		r1
 |
 |// Stack layout while in interpreter. Must match with lj_frame.h.
-|.define CFRAME_SPACE,	144	// Delta for sp.
+|.define CFRAME_SPACE,	152	// Delta for sp.
 |
-|.define SAVE_ERRF,	168	// 64 bit C frame info.
-|.define SAVE_NRES,	160
-|.define SAVE_CFRAME,	152
-|.define SAVE_L,	144
+|.define SAVE_ERRF,	176	// 64 bit C frame info.
+|.define SAVE_NRES,	168
+|.define SAVE_CFRAME,	160
+|.define SAVE_L,	152
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by interpreter.
-|.define TILE_ABI_RESERV,	32	// .. 32+14*8: 64 bit GPR saves.
+|.define TILE_ABI_RESERV,	32	// .. 32+15*8: 64 bit GPR saves.
 |.define SAVE_MULTRES,		24	
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
@@ -112,6 +113,8 @@
 |  addi sp, sp, -8
 |  st sp, r41
 |  addi sp, sp, -8
+|  st sp, r42
+|  addi sp, sp, -8
 |  st sp, r52
 |  addi sp, sp, -8
 |  st sp, lr
@@ -123,6 +126,8 @@
 |  ld lr, sp
 |  addi sp, sp, 8
 |  ld r52, sp
+|  addi sp, sp, 8
+|  ld r42, sp
 |  addi sp, sp, 8
 |  ld r41, sp
 |  addi sp, sp, 8
@@ -2037,8 +2042,8 @@ static void build_subroutines(BuildCtx *ctx)
   |   //cvt.w.d f0, f0
   |  move CROSSTMP1, CARG1
   |  move CROSSTMP2, CARG2
-  |  move CROSSTMP2, CARG3
-  |  move MULTRES, AT3
+  |  move CROSSTMP3, CARG3
+  |  move CROSSTMP5, AT3
   |  move CARG1, AT2
   |  load_got __fixdfsi
   |  call_extern
@@ -2046,7 +2051,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CARG1, CROSSTMP1
   |  move CARG2, CROSSTMP2
   |  move CARG3, CROSSTMP3
-  |  move AT3, MULTRES
+  |  move AT3, CROSSTMP5
   |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
   |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
   |  cmpltu AT, CARG3, AT
