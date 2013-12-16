@@ -1183,8 +1183,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld AT2, TMP1
   |  addi AT, TMP1, -8
   |  st AT, AT2
-  |  addli TMP1, TMP1, 8
   |  cmpne AT, TMP1, TMP2
+  |  addli TMP1, TMP1, 8
   |  bnez AT, <1
   |  b ->fff_res
   |
