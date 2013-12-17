@@ -795,7 +795,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  load_got lj_meta_tget
   |  addlo AT, L:LREG->base
   |  st AT, BASE
-  |  st sp, PC
+  |  addi AT, sp, SAVE_PC
+  |  st AT, PC
   |  move CARG1, L
   |  call_intern lj_meta_tget		// (lua_State *L, TValue *o, TValue *k)
   |  // Returns TValue * (finished) or NULL (metamethod).
@@ -2600,7 +2601,8 @@ static void build_subroutines(BuildCtx *ctx)
   |.endif
   |  load_got lj_dispatch_call
   |  add TMP0, BASE, RC
-  |   st sp, PC
+  |  addi AT, sp, SAVE_PC
+  |   st AT, PC
   |   addlo AT, L:LREG->base
   |   st AT, BASE
   |  sub RA, RA, BASE
