@@ -1161,9 +1161,9 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |// Inlined GC threshold check. Caveat: uses TMP0 and TMP1 and has delay slot!
   |.macro ffgccheck
-  |  addi TMP0, DISPATCH, DISPATCH_GL(gc.total)
+  |  addli TMP0, DISPATCH, DISPATCH_GL(gc.total)
   |  ld4u TMP0, TMP0
-  |  addi TMP1, DISPATCH, DISPATCH_GL(gc.threshold)
+  |  addli TMP1, DISPATCH, DISPATCH_GL(gc.threshold)
   |  ld4u TMP1, TMP1
   |  sub AT, TMP0, TMP1
   |  cmplts AT, zero, AT
@@ -1224,7 +1224,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  addlo TAB:CARG1, TAB:CARG1->metatable
   |  ld4u TAB:CARG1, TAB:CARG1
   |2:
-  |  addi STR:RC, DISPATCH, DISPATCH_GL(gcroot[GCROOT_MMNAME+MM_metatable])
+  |  addli STR:RC, DISPATCH, DISPATCH_GL(gcroot[GCROOT_MMNAME+MM_metatable])
   |  ld4u STR:RC, STR:RC
   |  addi CARG3, zero, LJ_TNIL
   |  beqz TAB:CARG1, ->fff_restv
@@ -1279,7 +1279,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  nor TMP1, TMP1, zero
   |  shli TMP1, TMP1, 2
   |  add TMP1, DISPATCH, TMP1
-  |  addi TAB:CARG1, TMP1, DISPATCH_GL(gcroot[GCROOT_BASEMT])
+  |  addli TAB:CARG1, TMP1, DISPATCH_GL(gcroot[GCROOT_BASEMT])
   |  ld TAB:CARG1, TAB:CARG1
   |  b <2
   |
@@ -1338,7 +1338,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi AT, zero, LJ_TSTR
   |  // A __tostring method in the string base metatable is ignored.
   |  // Handle numbers inline, unless a number base metatable is present.
-  |  addi TMP1, DISPATCH, DISPATCH_GL(gcroot[GCROOT_BASEMT_NUM])
+  |  addli TMP1, DISPATCH, DISPATCH_GL(gcroot[GCROOT_BASEMT_NUM])
   |  ld4u TMP1, TMP1
   |  cmpeq AT, CARG3, AT
   |  bnez AT, ->fff_restv			// String key?
@@ -1545,7 +1545,7 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Base library: catch errors ----------------------------------------
   |
   |.ffunc pcall
-  |  addi TMP3, DISPATCH, DISPATCH_GL(hookmask)
+  |  addli TMP3, DISPATCH, DISPATCH_GL(hookmask)
   |  ld1u TMP3, TMP3
   |  beqz NARGS8:RC, ->fff_fallback
   |   move TMP2, BASE
@@ -1565,7 +1565,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld AT2, AT2
   |    bnez AT, ->fff_fallback
   |   ld AT3, BASE
-  |    addi TMP1, DISPATCH, DISPATCH_GL(hookmask)
+  |    addli TMP1, DISPATCH, DISPATCH_GL(hookmask)
   |    ld1u TMP1, TMP1
   |  addi AT, zero, LJ_TFUNC
   |   move TMP2, BASE
@@ -1888,7 +1888,7 @@ static void build_subroutines(BuildCtx *ctx)
   |   ld4s PC, PC
   |  addli CARG2, DISPATCH, DISPATCH_GL(tmptv)
   |  call_extern
-  |   addi TMP1, DISPATCH, DISPATCH_GL(tmptv)
+  |   addli TMP1, DISPATCH, DISPATCH_GL(tmptv)
   |   ld TMP1, TMP1
   |  addli RA, BASE, -8
   |  st RA, CRET1
@@ -2160,7 +2160,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  addlo TMP0, STR:CARG1->len
   |  ld4u TMP0, TMP0
   |  beqz CROSSTMP2, ->fff_fallback
-  |  addi TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
+  |  addli TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
   |  ld4u TMP1, TMP1
   |  addi AT, zero, 1
   |   cmpltu AT, AT, TMP0
@@ -2168,7 +2168,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  cmpltu TMP0, TMP1, CARG3
   |  beqz TMP0, ->fff_emptystr		// Zero length string?
   |  or AT, AT, TMP0
-  |   addi CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
+  |   addli CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
   |   ld CARG2, CARG2
   |  addlo TMP0, STR:CARG1[1]
   |  ld1u TMP0, TMP0
@@ -2189,14 +2189,14 @@ static void build_subroutines(BuildCtx *ctx)
   |   ld4s STR:CARG1, STR:CARG1
   |  addi AT, zero, LJ_TSTR
   |  beqz NARGS8:RC, ->fff_fallback
-  |  addi TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
+  |  addli TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
   |  ld4u TMP1, TMP1
   |  cmpne AT, CARG3, AT
   |  bnez AT, ->fff_fallback
   |  addlo CARG3, STR:CARG1->len
   |  ld4u CARG3, CARG3
   |   addli CARG1, STR:CARG1, #STR
-  |   addi CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
+  |   addli CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
   |   ld CARG2, CARG2
   |  cmpltu AT, TMP1, CARG3
   |  add TMP3, CARG1, CARG3
@@ -2220,14 +2220,14 @@ static void build_subroutines(BuildCtx *ctx)
   |   ld4s STR:CARG1, STR:CARG1
   |  addi AT, zero, LJ_TSTR
   |  beqz NARGS8:RC, ->fff_fallback
-  |  addi TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
+  |  addli TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
   |  ld4u TMP1, TMP1
   |  cmpne AT, CARG3, AT
   |  bnez AT, ->fff_fallback
   |  addlo CARG3, STR:CARG1->len
   |  ld4u CARG3, CARG3
   |   addli CARG1, STR:CARG1, #STR
-  |   addi CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
+  |   addli CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
   |   ld CARG2, CARG2
   |  cmpltu AT, TMP1, CARG3
   |  add TMP3, CARG1, CARG3
@@ -2487,11 +2487,11 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vm_record:				// Dispatch target for recording phase.
   |.if JIT
-  |  addi TMP3, DISPATCH, DISPATCH_GL(hookmask)
+  |  addli TMP3, DISPATCH, DISPATCH_GL(hookmask)
   |  ld1u TMP3, TMP3
   |  andi AT, TMP3, HOOK_VMEVENT	// No recording while in vmevent.
   |  // Decrement the hookcount for consistency, but always do the call.
-  |  addi TMP2, DISPATCH, DISPATCH_GL(hookcount)
+  |  addli TMP2, DISPATCH, DISPATCH_GL(hookcount)
   |  ld4u TMP2, TMP2
   |  bnez AT, >5
   |  andi AT, TMP3, HOOK_ACTIVE
@@ -2499,13 +2499,13 @@ static void build_subroutines(BuildCtx *ctx)
   |  bnez AT, >1
   |  andi AT, TMP3, LUA_MASKLINE|LUA_MASKCOUNT
   |  beqz AT, >1
-  |  addi AT, DISPATCH, DISPATCH_GL(hookcount)
+  |  addli AT, DISPATCH, DISPATCH_GL(hookcount)
   |  st4 AT, TMP2
   |  b >1
   |.endif
   |
   |->vm_rethook:			// Dispatch target for return hooks.
-  |  addi TMP3, DISPATCH, DISPATCH_GL(hookmask)
+  |  addli TMP3, DISPATCH, DISPATCH_GL(hookmask)
   |  ld1u TMP3, TMP3
   |  andi AT, TMP3, HOOK_ACTIVE		// Hook already active?
   |  beqz AT, >1
@@ -2515,16 +2515,16 @@ static void build_subroutines(BuildCtx *ctx)
   |  jr AT
   |
   |->vm_inshook:			// Dispatch target for instr/line hooks.
-  |  addi TMP3, DISPATCH, DISPATCH_GL(hookmask)
+  |  addli TMP3, DISPATCH, DISPATCH_GL(hookmask)
   |  ld1u TMP3, TMP3
-  |  addi TMP2, DISPATCH, DISPATCH_GL(hookcount)
+  |  addli TMP2, DISPATCH, DISPATCH_GL(hookcount)
   |  ld4u TMP2, TMP2
   |  andi AT, TMP3, HOOK_ACTIVE		// Hook already active?
   |  andi AT, TMP3, LUA_MASKLINE|LUA_MASKCOUNT
   |  bnez AT, <5
   |  addli TMP2, TMP2, -1
   |  beqz AT, <5
-  |  addi AT, DISPATCH, DISPATCH_GL(hookcount)
+  |  addli AT, DISPATCH, DISPATCH_GL(hookcount)
   |  st4 AT, TMP2
   |  beqz TMP2, >1
   |  andi AT, TMP3, LUA_MASKLINE
@@ -2667,9 +2667,9 @@ static void build_subroutines(BuildCtx *ctx)
   |  st_vmstate
   |   addli AT, sp, 16+32*8+29*4
   |   st AT, TMP2
-  |  addi L, DISPATCH, DISPATCH_GL(jit_L)
+  |  addli L, DISPATCH, DISPATCH_GL(jit_L)
   |  ld L, L
-  |  addi BASE, DISPATCH, DISPATCH_GL(jit_base)
+  |  addli BASE, DISPATCH, DISPATCH_GL(jit_base)
   |  ld BASE, BASE
   |  load_got lj_trace_exit
   |  addli AT, DISPATCH, DISPATCH_J(L)
@@ -2713,7 +2713,7 @@ static void build_subroutines(BuildCtx *ctx)
   |    //mtc1 TMP3, TOBIT
   |  addlo TMP1, LFUNC:TMP1->pc
   |  ld4u TMP1, TMP1
-  |   addi AT, DISPATCH, DISPATCH_GL(jit_L)
+  |   addli AT, DISPATCH, DISPATCH_GL(jit_L)
   |   st4 AT, zero
   |  addi KBASE, TMP1, PC2PROTO(k)
   |  ld4u KBASE, KBASE
@@ -2722,7 +2722,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld INS, PC
   |   addli PC, PC, 4
   |    // Assumes TISNIL == ~LJ_VMST_INTERP == -1
-  |    addi AT, DISPATCH, DISPATCH_GL(vmstate)
+  |    addli AT, DISPATCH, DISPATCH_GL(vmstate)
   |    st4 AT, TISNIL
   |  decode_OP4a TMP1, INS
   |  decode_OP4b TMP1
