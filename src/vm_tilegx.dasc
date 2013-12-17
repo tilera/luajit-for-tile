@@ -33,6 +33,8 @@
 |.define CROSSTMP3,	r40
 |.define CROSSTMP4,	r41
 |.define CROSSTMP5,	r42
+|.define CROSSTMP6,	r43
+|.define CROSSTMP7,	r44
 |
 |.define JGL,		r52	// On-trace: global_State + 32768.
 |
@@ -74,14 +76,14 @@
 |.define CRET2,		r1
 |
 |// Stack layout while in interpreter. Must match with lj_frame.h.
-|.define CFRAME_SPACE,	152	// Delta for sp.
+|.define CFRAME_SPACE,	168	// Delta for sp.
 |
-|.define SAVE_ERRF,	176	// 64 bit C frame info.
-|.define SAVE_NRES,	168
-|.define SAVE_CFRAME,	160
-|.define SAVE_L,	152
+|.define SAVE_ERRF,	192	// 64 bit C frame info.
+|.define SAVE_NRES,	184
+|.define SAVE_CFRAME,	176
+|.define SAVE_L,	168
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by interpreter.
-|.define TILE_ABI_RESERV,	32	// .. 32+15*8: 64 bit GPR saves.
+|.define TILE_ABI_RESERV,	32	// .. 32+17*8: 64 bit GPR saves.
 |.define SAVE_MULTRES,		24	
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
@@ -115,6 +117,10 @@
 |  addi sp, sp, -8
 |  st sp, r42
 |  addi sp, sp, -8
+|  st sp, r43
+|  addi sp, sp, -8
+|  st sp, r44
+|  addi sp, sp, -8
 |  st sp, r52
 |  addi sp, sp, -8
 |  st sp, lr
@@ -126,6 +132,10 @@
 |  ld lr, sp
 |  addi sp, sp, 8
 |  ld r52, sp
+|  addi sp, sp, 8
+|  ld r44, sp
+|  addi sp, sp, 8
+|  ld r43, sp
 |  addi sp, sp, 8
 |  ld r42, sp
 |  addi sp, sp, 8
@@ -145,7 +155,7 @@
 |  addi sp, sp, 8
 |  ld r34, sp
 |  addi sp, sp, 8
-|  ld r32, sp
+|  ld r33, sp
 |  addi sp, sp, 8
 |  ld r32, sp
 |  addi sp, sp, 8
@@ -1439,6 +1449,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CROSSTMP2, CARG2
   |  move CROSSTMP3, CARG3
   |  move CROSSTMP4, CARG4
+  |  move CROSSTMP6, RB
+  |  move CROSSTMP7, RC
   |  move CARG1, CARG2
   |  load_got __fixdfsi
   |  call_extern
@@ -1447,6 +1459,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CARG2, CROSSTMP2
   |  move CARG3, CROSSTMP3
   |  move CARG4, CROSSTMP4
+  |  move RB, CROSSTMP6
+  |  move RC, CROSSTMP7
   |  //cvt.d.w FARG1, FARG1
   |  addi TMP3, zero, 1
   |  cmpltsi AT, TMP3, 0
@@ -1998,9 +2012,15 @@ static void build_subroutines(BuildCtx *ctx)
   |  beqz AT1, ->fff_fallback
   |   //cvt.w.d FARG1, FARG1
   |  move CROSSTMP1, CARG3
+  |  move CROSSTMP2, TMP0
+  |  move CROSSTMP6, RB
+  |  move CROSSTMP7, RC
   |  load_got __fixdfsi
   |  call_extern
   |  move CARG3, CROSSTMP1
+  |  move TMP0, CROSSTMP2
+  |  move RB, CROSSTMP6
+  |  move RC, CROSSTMP7
   |  move TMP1, CRET1
   |  addli AT, zero, 256
   |  cmpltu AT, TMP0, AT
@@ -2045,6 +2065,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CROSSTMP2, CARG2
   |  move CROSSTMP3, CARG3
   |  move CROSSTMP5, AT3
+  |  move CROSSTMP6, RB
+  |  move CROSSTMP7, RC
   |  move CARG1, AT2
   |  load_got __fixdfsi
   |  call_extern
@@ -2053,6 +2075,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CARG2, CROSSTMP2
   |  move CARG3, CROSSTMP3
   |  move AT3, CROSSTMP5
+  |  move RB, CROSSTMP6
+  |  move RC, CROSSTMP7
   |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
   |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
   |  cmpltu AT, CARG3, AT
@@ -2065,12 +2089,16 @@ static void build_subroutines(BuildCtx *ctx)
   |  //cvt.w.d f2, f2
   |  move CROSSTMP1, CARG1
   |  move CROSSTMP2, CARG4
+  |  move CROSSTMP6, RB
+  |  move CROSSTMP7, RC
   |  move CARG1, AT3
   |  load_got __fixdfsi
   |  call_extern
   |  move CARG3, CRET1
   |  move CARG1, CROSSTMP1
   |  move CARG4, CROSSTMP2
+  |  move RB, CROSSTMP6
+  |  move RC, CROSSTMP7
   |  addlo CARG2, STR:CARG1->len
   |  ld4u CARG2, CARG2
   |  addi AT, zero, LJ_TSTR
@@ -2120,11 +2148,15 @@ static void build_subroutines(BuildCtx *ctx)
   |  bnez AT, ->fff_fallback
   |   //cvt.w.d f0, f0
   |  move CROSSTMP1, CARG1
+  |  move CROSSTMP6, RB
+  |  move CROSSTMP7, RC
   |  move CARG1, AT2
   |  load_got __fixdfsi
   |  call_extern
   |  move CARG3, CRET1
   |  move CARG1, CROSSTMP1
+  |  move RB, CROSSTMP6
+  |  move RC, CROSSTMP7
   |  addlo TMP0, STR:CARG1->len
   |  ld4u TMP0, TMP0
   |  beqz CROSSTMP2, ->fff_fallback
@@ -3832,10 +3864,14 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  move CROSSTMP2, CARG3
     |  move CARG1, AT2
     |  move CROSSTMP3, AT2
+    |  move CROSSTMP6, RB
+    |  move CROSSTMP7, RC
     |  load_got __fixdfsi
     |  call_extern
     |  move CARG2, CROSSTMP1
     |  move CARG3, CROSSTMP2
+    |  move RB, CROSSTMP6
+    |  move RC, CROSSTMP7
     |  move TMP3, CRET1
     |   addlo TMP0, TAB:RB->asize
     |   ld4u TMP0, TMP0
@@ -4029,10 +4065,14 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  move CROSSTMP2, CARG3
     |  move CARG1, AT2
     |  move CROSSTMP3, AT2
+    |  move CROSSTMP6, RB
+    |  move CROSSTMP7, RC
     |  load_got __fixdfsi
     |  call_extern
     |  move CARG2, CROSSTMP1
     |  move CARG3, CROSSTMP2
+    |  move RB, CROSSTMP6
+    |  move RC, CROSSTMP7
     |  move TMP3, CRET1
     |   addlo TMP0, TAB:RB->asize
     |   ld4u TMP0, TMP0
@@ -4185,8 +4225,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  move CARG2, TAB:RB
     |   addi AT, sp, SAVE_PC
     |   st AT, PC
+    |  move CROSSTMP1, AT2
     |  move CARG1, L
     |  call_intern lj_tab_newkey	// (lua_State *L, GCtab *t, TValue *k
+    |  move AT2, CROSSTMP1
     |  // Returns TValue *.
     |  addlo BASE, L->base
     |  ld BASE, BASE
