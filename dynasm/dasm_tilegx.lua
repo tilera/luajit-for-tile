@@ -81,14 +81,22 @@ local function writeactions(out, name)
   for i = 1,nn-1 do
     if (sub(string.format("%016X", actlist[i]), 1, 8) == "00000001") then
       -- X0 bundle.
-      assert(out:write("0x286A3000", sub(string.format("%08X", actlist[i]), 2, 9), "L,\n"))
+      if (sub(string.format("%016X", actlist[i]), 9, 16) ~= "51483000") then
+        assert(out:write("0x286A3000", sub(string.format("%016X", actlist[i]), 9, 16), "L,\n"))
+      else
+        assert(out:write("0x", string.format("%016X", actlist[i]), "L,\n"))
+      end
     else
       assert(out:write("0x", string.format("%016X", actlist[i]), "L,\n"))
     end
   end
   if (sub(string.format("%016X", actlist[nn]), 1, 8) == "00000001") then
     -- X0 bundle.
-    assert(out:write("0x286A3000", sub(string.format("%08X", actlist[nn]), 2, 9), "L,\n"))
+    if (sub(string.format("%016X", actlist[i]), 9, 16) ~= "51483000") then
+      assert(out:write("0x286A3000", sub(string.format("%016X", actlist[nn]), 9, 16), "L,\n"))
+    else
+      assert(out:write("0x", string.format("%016X", actlist[nn]), "L\n};\n\n"))
+    end
   else
     assert(out:write("0x", string.format("%016X", actlist[nn]), "L\n};\n\n"))
   end
