@@ -35,6 +35,7 @@
 |.define CROSSTMP5,	r42
 |.define CROSSTMP6,	r43
 |.define CROSSTMP7,	r44
+|.define ASMENTRY,	r45
 |
 |.define JGL,		r52	// On-trace: global_State + 32768.
 |
@@ -76,14 +77,14 @@
 |.define CRET2,		r1
 |
 |// Stack layout while in interpreter. Must match with lj_frame.h.
-|.define CFRAME_SPACE,	168	// Delta for sp.
+|.define CFRAME_SPACE,	176	// Delta for sp.
 |
-|.define SAVE_ERRF,	192	// 64 bit C frame info.
-|.define SAVE_NRES,	184
-|.define SAVE_CFRAME,	176
-|.define SAVE_L,	168
+|.define SAVE_ERRF,	200	// 64 bit C frame info.
+|.define SAVE_NRES,	192
+|.define SAVE_CFRAME,	184
+|.define SAVE_L,	176
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by interpreter.
-|.define TILE_ABI_RESERV,	32	// .. 32+17*8: 64 bit GPR saves.
+|.define TILE_ABI_RESERV,	32	// .. 32+18*8: 64 bit GPR saves.
 |.define SAVE_MULTRES,		24	
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
@@ -121,6 +122,8 @@
 |  addi sp, sp, -8
 |  st sp, r44
 |  addi sp, sp, -8
+|  st sp, r45
+|  addi sp, sp, -8
 |  st sp, r52
 |  addi sp, sp, -8
 |  st sp, lr
@@ -132,6 +135,8 @@
 |  ld lr, sp
 |  addi sp, sp, 8
 |  ld r52, sp
+|  addi sp, sp, 8
+|  ld r45, sp
 |  addi sp, sp, 8
 |  ld r44, sp
 |  addi sp, sp, 8
@@ -366,6 +371,7 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vm_returnp:
   |  // See vm_return. Also: TMP2 = previous base.
+  |  lnk ASMENTRY
   |  andi AT, PC, FRAME_P
   |  addi TMP1, zero, LJ_TTRUE
   |  beqz AT, ->cont_dispatch
@@ -700,6 +706,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  // BASE = meta base, RA = resultptr, RD = (nresults+1)*8
   |  addi TMP0, BASE, -16+LO
   |  ld4s TMP0, TMP0
+  |  add TMP0, TMP0, ASMENTRY
+  |  addi TMP0, TMP0, -8
   |   move RB, BASE
   |   move BASE, TMP2			// Restore caller BASE.
   |    addi LFUNC:TMP1, TMP2, FRAME_FUNC
@@ -712,14 +720,14 @@ static void build_subroutines(BuildCtx *ctx)
   |   add TMP2, RA, RD
   |    addlo TMP1, LFUNC:TMP1->pc
   |    ld4u TMP1, TMP1
-  |  addi AT, TMP2, -8+HI
-  |  st4 AT, TISNIL
+  |  addi AT1, TMP2, -8+HI
+  |  st4 AT1, TISNIL
   |.if FFI
   |  bnez AT, >1
   |.endif
   |  // BASE = base, RA = resultptr, RB = meta base
-  |  addi AT, TMP1, PC2PROTO(k)
-  |  ld4u KBASE, AT
+  |  addi KBASE, TMP1, PC2PROTO(k)
+  |  ld4u KBASE, KBASE
   |  jr TMP0				// Jump to continuation.
   |
   |.if FFI

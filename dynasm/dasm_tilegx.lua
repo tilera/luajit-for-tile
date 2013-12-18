@@ -308,6 +308,7 @@ local map_op = {
   bgtz_2 =		"1540000051483000AK",
   bgez_2 =		"14C0000051483000AK",
   b_1 = 		"144007e051483000K",
+  lnk_1 = 		"286AF00051483000D",
 
   -- Compare Instructions.
   cmpeq_3 =		"280a000051483000DAB",
