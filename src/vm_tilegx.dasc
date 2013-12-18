@@ -3488,8 +3488,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  move CARG1, L
     |  call_intern lj_meta_cat		// (lua_State *L, TValue *top, int left)
     |  // Returns NULL (finished) or TValue * (metamethod).
-    |  addlo AT, L:LREG->base
-    |  ld BASE, AT
+    |  addlo BASE, L:LREG->base
+    |  ld BASE, BASE
     |  bnez CRET1, ->vmeta_binop
     |  add RB, BASE, MULTRES
     |  ld AT2, RB
@@ -3625,17 +3625,22 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |   st CARG2, AT2
     |  addi AT, zero, LJ_GC_BLACK|1
     |  or TMP3, TMP3, TMP0
-    |  addli TMP2, TMP2, -(LJ_TISNUM+1)
     |  cmpeq AT, TMP3, AT
     |  bnez AT, >2			// Upvalue is closed and black?
     |1:
     |  ins_next
     |
     |2:  // Check if new value is collectable.
-    |  cmpltui AT, TMP2, LJ_TISGCV - (LJ_TISNUM+1)
+    |  addi AT, zero, LJ_TISGCV
+    |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
+    |  sub AT2, TMP2, AT
+    |  sub AT3, AT1, AT
+    |  bfextu AT3, AT3, 0, 31
+    |  cmpltu AT, AT2, AT3
     |  addi TMP1, RD, LO
     |  ld4s TMP1, TMP1
-    |  beqz AT, <1			// tvisgcv(v)
+    |  bnez AT, <1			// tvisgcv(v)
     |  addlo TMP3, GCOBJ:TMP1->gch.marked
     |  ld1u TMP3, TMP3
     |  andi TMP3, TMP3, LJ_GC_WHITES	// iswhite(v)
