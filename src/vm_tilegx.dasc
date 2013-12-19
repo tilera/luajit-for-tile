@@ -2362,7 +2362,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  fdouble_pack1 CARG1, AT, AT1
   |  fdouble_pack2 CARG1, AT, zero
   |  //mfc1 CARG1, FARG1
-  |  bfextu AT5, CARG1, 0, 31
+  |  bfexts AT5, CARG1, 0, 31
   |  //add.d FARG2, FARG2, TOBIT
   |  moveli AT, 17208 // 0x4338
   |  shl16insli AT, AT, 0
@@ -2375,7 +2375,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  fdouble_pack1 CARG2, AT, AT1
   |  fdouble_pack2 CARG2, AT, zero
   |  //mfc1 CARG2, FARG2
-  |  bfextu AT4, CARG2, 0, 31
+  |  bfexts AT4, CARG2, 0, 31
   |.if shmod == 1
   |  addi AT, zero, 32
   |  sub TMP0, AT, CARG2
