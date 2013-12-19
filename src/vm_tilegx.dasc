@@ -1210,17 +1210,23 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc type
   |  addi CARG3, BASE, HI
   |  ld4s CARG3, CARG3
-  |  moveli TMP1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli TMP1, TMP1, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu TMP0, CARG3, TMP1
-  |  beqz NARGS8:RC, ->fff_fallback
-  |  cmoveqz TMP1, TMP0, CARG3
-  |  nor TMP1, TMP1, zero
+  |  move AT, CARG3
+  |  shrsi AT, AT, 15
+  |  cmpeqi AT, AT, -2
+  |  bnez AT, >3
+  |  movei TMP1, ~LJ_TNUMX
+  |  nor CARG3, CARG3, zero
+  |  cmpleu TMP0, CARG3, TMP1
+  |  cmovnez TMP1, TMP0, CARG3
+  |2:
   |  shli TMP1, TMP1, 3
   |  add TMP1, CFUNC:RB, TMP1
   |  addlo CRET1, CFUNC:TMP1->upvalue
   |  ld CRET1, CRET1
   |  b ->fff_resn
+  |3:  
+  |  movei TMP1, ~LJ_TLIGHTUD
+  |  b <2
   |
   |//-- Base library: getters and setters ---------------------------------
   |

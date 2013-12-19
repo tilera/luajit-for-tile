@@ -312,9 +312,11 @@ local map_op = {
 
   -- Compare Instructions.
   cmpeq_3 =		"280a000051483000DAB",
+  cmpeqi_3 =		"1820000051483000DAi",
   cmpne_3 =		"2818000051483000DAB",
   cmplts_3 =		"2814000051483000DAB",
   cmpltu_3 =		"2816000051483000DAB",
+  cmpleu_3 =		"2812000051483000DAB",
   cmpltsi_3 =		"1828000051483000DAi",
   cmpltui_3 =		"1830000051483000DAi",
 
