@@ -28,7 +28,7 @@ local sub, format, byte, char = _s.sub, _s.format, _s.byte, _s.char
 local match, gmatch = _s.match, _s.gmatch
 local concat, sort = table.concat, table.sort
 local bit = bit or require("bit")
-local band, shl, shll, sar = bit.band, bit.lshift, bit.llshift, bit.arshift
+local band, shl, sar, tobit, tobinary = bit.band, bit.lshift, bit.arshift, bit.tobit, bit.tobinary
 
 -- Inherited tables and callbacks.
 local g_opt, g_arch
@@ -76,30 +76,40 @@ end
 -- Write action list buffer as a huge static C array.
 local function writeactions(out, name)
   local nn = #actlist
+  local nnn = nn
   if nn == 0 then nn = 1; actlist[0] = map_action.STOP end
-  out:write("static const unsigned long ", name, "[", nn, "] = {\n")
+
   for i = 1,nn-1 do
-    if (sub(string.format("%016X", actlist[i]), 1, 8) == "00000001") then
-      -- X0 bundle.
-      if (sub(string.format("%016X", actlist[i]), 9, 16) ~= "51483000") then
-        assert(out:write("0x286A3000", sub(string.format("%016X", actlist[i]), 9, 16), "L,\n"))
-      else
-        assert(out:write("0x", string.format("%016X", actlist[i]), "L,\n"))
-      end
-    else
-      assert(out:write("0x", string.format("%016X", actlist[i]), "L,\n"))
+    if (tobit(actlist[i]) == -1) then
+	    nnn = nnn - 2
+    else if (tobit(actlist[i]) == -2) then
+	    nnn = nnn - 3
+    else if (tobit(actlist[i]) == -3) then
+	    nnn = nnn - 3
+    else if (tobit(actlist[i]) == -4) then
+	    nnn = nnn - 3
+    end
+    end
+    end
     end
   end
-  if (sub(string.format("%016X", actlist[nn]), 1, 8) == "00000001") then
-    -- X0 bundle.
-    if (sub(string.format("%016X", actlist[i]), 9, 16) ~= "51483000") then
-      assert(out:write("0x286A3000", sub(string.format("%016X", actlist[nn]), 9, 16), "L,\n"))
+  out:write("static const unsigned long ", name, "[", nnn, "] = {\n")
+
+  local i = 1
+  while i <= nn - 1 do
+    if (tobit(actlist[i]) == -1) then
+      assert(out:write("0b00"))
+      nnn = i + 2 -- X1
+      assert(out:write(tobinary(actlist[nnn], 31)))
+      nnn = i + 1 -- X0
+      assert(out:write(tobinary(actlist[nnn], 31), "L,\n"))
+      i = i + 3
     else
-      assert(out:write("0x", string.format("%016X", actlist[nn]), "L\n};\n\n"))
+      assert(out:write(tobinary(actlist[i], 31), "L,\n"))
+      i = i + 1
     end
-  else
-    assert(out:write("0x", string.format("%016X", actlist[nn]), "L\n};\n\n"))
   end
+  assert(out:write("0b", tobinary(actlist[nn], 32), "L\n};\n\n"))
 end
 
 ------------------------------------------------------------------------------
@@ -244,95 +254,134 @@ end
 ------------------------------------------------------------------------------
 
 -- Template strings for TileGX instructions.
--- "D": Dest Reg in X1 slot.
--- "A": SrcA Reg in X1 slot.
--- "B": SrcB Reg in X1 slot.
--- "I": Imm16 in X1 slot.
--- "i": Imm8 in X1 slot.
+-- "D": Dest Reg in X slot.
+-- "A": SrcA Reg in X slot.
+-- "B": SrcB Reg in X slot.
+-- "I": Imm16 in X slot.
+-- "i": Imm8 in X slot.
 
 local map_op = {
+  -- Bundle Markers.
+  B_X_0 =	"FFFFFFFF",
+  B_Y0_0 =	"FFFFFFFE",
+  B_Y1_0 =	"FFFFFFFD",
+  B_Y2_0 =	"FFFFFFFC",
+
   -- Arithmetic Instructions.
-  move_2 =		"283BF80051483000DA",
-  add_3 =		"2806000051483000DAB",
-  addi_3 =		"1808000051483000DAi",
-  moveli_2 =		"000007E051483000DI",
-  movei_2 =		"180807E051483000Di",
-  addli_3 =		"0000000051483000DAI",
-  addlo_2 =		"0000000051483000DO",
-  shl16insli_3 =	"3800000051483000DAI",
-  sub_3 =		"2868000051483000DAB",
+  B_move_x0_2 =		"5107F000DA",
+  B_move_x1_2 =		"5077F000DA",
+  B_add_x0_3 =		"500C0000DAB",
+  B_add_x1_3 =		"500C0000DAB",
+  B_addi_x0_3 =		"40100000DAi",
+  B_addi_x1_3 =		"30100000DAi",
+  B_addli_x0_3 =	"10000000DAI",
+  B_addli_x1_3 =	"00000000DAI",
+  B_moveli_x0_2 =	"10000FC0DI",
+  B_moveli_x1_2 =	"00000FC0DI",
+  B_movei_x0_2 =	"40100FC0DI",
+  B_movei_x1_2 =	"30100FC0DI",
+  B_addlo_x0_2 =	"10000000DO",
+  B_addlo_x1_2 =	"00000000DO",
+  B_shl16insli_x0_3 =	"70000000DAI",
+  B_shl16insli_x1_3 =	"70000000DAI",
+  B_sub_x0_3 =		"51440000DAB",
+  B_sub_x1_3 =		"50D00000DAB",
 
   -- Logical Instructions.
-  and_3 =		"2808000051483000DAB",  
-  or_3 =		"283A000051483000DAB",  
-  nor_3 =		"2838000051483000DAB",  
-  xor_3 =		"28D6000051483000DAB",  
-  xori_3 =		"1968000051483000DAi",  
-  andi_3 =		"1818000051483000DAi",
-  ori_3 =		"18C0000051483000DAi",
-  shl_3 =		"284C000051483000DAB",
-  shli_3 =		"3004000051483000DAi",
-  shru_3 =		"2852000051483000DAB",
-  shrui_3 =		"300A000051483000DAi",
-  shrs_3 =		"284E000051483000DAB",
-  shrsi_3 =		"3008000051483000DAi",
-  -- bfextu_4 =		"286A300035000000EFGH",
-  bfextu_4 =		"0000000135000000EFGH",
-  bfexts_4 =		"0000000134000000EFGH",
-  bfins_4 =		"0000000136000000EFGH",
-  cmoveqz_3 =		"0000000150140000EFC",
-  cmovnez_3 =		"0000000150180000EFC",
+  B_and_x0_3 =		"50100000DAB",
+  B_and_x1_3 =		"50100000DAB",
+  B_or_x0_3 =		"51040000DAB",
+  B_or_x1_3 =		"50740000DAB",
+  B_nor_x0_3 =		"51000000DAB",
+  B_nor_x1_3 =		"50700000DAB",
+  B_xor_x0_3 =		"52800000DAB",
+  B_xor_x1_3 =		"51AC0000DAB",
+  B_xori_x0_3 =		"41400000DAi",
+  B_xori_x1_3 =		"32D00000DAi",
+  B_andi_x0_3 =		"40300000DAi",
+  B_andi_x1_3 =		"30300000DAi",
+  B_ori_x0_3 =		"40700000DAi",
+  B_ori_x1_3 =		"31800000DAi",
+  B_shl_x0_3 =		"51280000DAB",
+  B_shl_x1_3 =		"50980000DAB",
+  B_shli_x0_3 =		"60080000DAi",
+  B_shli_x1_3 =		"60080000DAi",
+  B_shru_x0_3 =		"51340000DAB",
+  B_shru_x1_3 =		"50A40000DAB",
+  B_shrui_x0_3 =	"60140000DAi",
+  B_shrui_x1_3 =	"60140000DAi",
+  B_shrs_x0_3 =		"512C0000DAB",
+  B_shrs_x1_3 =		"509C0000DAB",
+  B_shrsi_x0_3 =	"60100000DAi",
+  B_shrsi_x1_3 =	"60100000DAi",
+  B_bfextu_x0_4 =	"35000000DAGH",
+  B_bfexts_x0_4 =	"34000000DAGH",
+  B_bfins_x0_4 =	"36000000DAGH",
+  B_cmoveqz_x0_3 =	"50140000DAB",
+  B_cmovnez_x0_3 =	"50180000DAB",
 
   -- Memory Instructions.
-  st_2 =		"DE064000340C3000ab",
-  st4_2 =		"DE064000300C3000ab",
-  st2_2 =		"DC064000340C3000ab",
-  st1_2 =		"DC064000300C3000ab",
-  ld_2 =		"9E064000340C3000ba",
-  ld4u_2 =		"9E064000300C3000ba",
-  ld2u_2 =		"5E064000340C3000ba",
-  ld1u_2 =		"5C064000340C3000ba",
-  ld4s_2 =		"9C064000340C3000ba",
-  ld2s_2 =		"5E064000300C3000ba",
-  ld1s_2 =		"5C064000300C3000ba",
+  B_st_x1_2 =		"50C40000AB",
+  B_st4_x1_2 =		"50B00000AB",
+  B_st2_x1_2 =		"50AC0000AB",
+  B_st1_x1_2 =		"50A80000AB",
+  B_ld_x1_2 =		"50D5D000DA",
+  B_ld4u_x1_2 =		"50D54000DA",
+  B_ld4s_x1_2 =		"50D53000DA",
+  B_ld2u_x1_2 =		"50D52000DA",
+  B_ld2s_x1_2 =		"50D51000DA",
+  B_ld1u_x1_2 =		"50D50000DA",
+  B_ld1s_x1_2 =		"50D4F000DA",
 
   -- Control Instructions.
-  jr_1 =		"286A700051483000A",
-  jal_1 =		"2000000051483000J",
-  j_1 =			"2400000051483000J",
-  jalr_1 =		"286A600051483000A",
-  beqz_2 =		"1440000051483000AK",
-  bnez_2 =		"17C0000051483000AK",
-  bltz_2 =		"1740000051483000AK",
-  blez_2 =		"16C0000051483000AK",
-  bgtz_2 =		"1540000051483000AK",
-  bgez_2 =		"14C0000051483000AK",
-  b_1 = 		"144007e051483000K",
-  lnk_1 = 		"286AF00051483000D",
+  B_j_x1_1 =		"48000000J",
+  B_jr_x1_1 =		"50D4E000A",
+  B_jal_x1_1 =		"40000000J",
+  B_jalr_x1_1 =		"50D4C000A",
+  B_b_x1_1 =		"28800FC0K",
+  B_beqz_x1_2 =		"28800000AK",
+  B_bnez_x1_2 =		"2F800000AK",
+  B_bltz_x1_2 =		"2E800000AK",
+  B_blez_x1_2 =		"2D800000AK",
+  B_bgtz_x1_2 =		"2A800000AK",
+  B_bgez_x1_2 =		"29800000AK",
+  B_lnk_x1_1 =		"50D5E000D",
 
   -- Compare Instructions.
-  cmpeq_3 =		"280a000051483000DAB",
-  cmpeqi_3 =		"1820000051483000DAi",
-  cmpne_3 =		"2818000051483000DAB",
-  cmplts_3 =		"2814000051483000DAB",
-  cmpltu_3 =		"2816000051483000DAB",
-  cmpleu_3 =		"2812000051483000DAB",
-  cmpltsi_3 =		"1828000051483000DAi",
-  cmpltui_3 =		"1830000051483000DAi",
+  B_cmpeq_x0_3 =	"501C0000DAB",
+  B_cmpeq_x1_3 =	"50140000DAB",
+  B_cmpne_x0_3 =	"50300000DAB",
+  B_cmpne_x1_3 =	"50300000DAB",
+  B_cmplts_x0_3 =	"50280000DAB",
+  B_cmplts_x1_3 =	"50280000DAB",
+  B_cmpltu_x0_3 =	"502C0000DAB",
+  B_cmpltu_x1_3 =	"502C0000DAB",
+  B_cmpleu_x0_3 =	"50240000DAB",
+  B_cmpleu_x1_3 =	"50240000DAB",
+  B_cmpeqi_x0_3 =	"40400000DAi",
+  B_cmpeqi_x1_3 =	"30400000DAi",
+  B_cmpltsi_x0_3 =	"40500000DAi",
+  B_cmpltsi_x1_3 =	"30500000DAi",
+  B_cmpltui_x0_3 =	"40600000DAi",
+  B_cmpltui_x1_3 =	"30600000DAi",
 
   -- Float
-  mul_hu_lu_3 =		"0000000150EC0000EFC",
-  mul_lu_lu_3 =		"0000000150F80000EFC",
-  mula_hu_lu_3 =	"0000000150C00000EFC",
-  mul_hu_hu_3 =		"0000000150E40000EFC",
-  fdouble_pack1_3 =	"0000000150740000EFC",
-  fdouble_pack2_3 =	"0000000150780000EFC",
-  fdouble_add_flags_3 =	"00000001506C0000EFC",
-  fdouble_sub_flags_3 =	"00000001507C0000EFC",
-  fdouble_mul_flags_3 =	"0000000150700000EFC",
-  fdouble_addsub_3 =	"0000000150680000EFC",
-  fdouble_unpack_min_3 =	"0000000150840000EFC",
-  fdouble_unpack_max_3 =	"0000000150800000EFC",
+  B_mul_hu_lu_x0_3 =	"50EC0000DAB",
+  B_mul_lu_lu_x0_3 =	"50F80000DAB",
+  B_mul_hu_hu_x0_3 =	"50E40000DAB",
+  B_mula_hu_lu_x0_3 =	"50C00000DAB",
+  B_fdouble_pack1_x0_3 =	"50740000DAB",
+  B_fdouble_pack2_x0_3 =	"50780000DAB",
+  B_fdouble_add_flags_x0_3 =	"506C0000DAB",
+  B_fdouble_sub_flags_x0_3 =	"507C0000DAB",
+  B_fdouble_mul_flags_x0_3 =	"50700000DAB",
+  B_fdouble_addsub_x0_3 =	"50680000DAB",
+  B_fdouble_unpack_min_x0_3 =	"50840000DAB",
+  B_fdouble_unpack_max_x0_3 =	"50800000DAB",
+
+  -- Float
+  B_fnop_x0_0 =		"51483000",
+  B_fnop_x1_0 =		"50D46000",
 }
 
 ------------------------------------------------------------------------------
@@ -384,7 +433,7 @@ local function parse_rbo_x1_imm16(disp)
     local r, tp = parse_gpr(reg)
     if tp then
       waction("IMM", 2147483648 + 16 * 2097152, format(tp.ctypefmt, tailr))
-      return shll(r, 37)
+      return shl(r, 6)
     end
   end
   werror("bad displacement `"..disp.."'")
@@ -422,10 +471,9 @@ end
 
 ------------------------------------------------------------------------------
 
--- Handle opcodes defined with template strings.
+-- bundle version
 map_op[".template__"] = function(params, template, nparams)
-  if not params then return sub(template, 17) end
-  local op = tonumber(sub(template, 1, 16), 16)
+  local op = tonumber(sub(template, 1, 8), 16)
   local n = 1
 
   -- Limit number of section buffer positions used by a single dasm_put().
@@ -434,44 +482,32 @@ map_op[".template__"] = function(params, template, nparams)
   local pos = wpos()
 
   -- Process each character.
-  for p in gmatch(sub(template, 17), ".") do
+  for p in gmatch(sub(template, 9), ".") do
 
     -- X mode
     if p == "A" then
-      op = op + shll(parse_gpr(params[n]), 37); n = n + 1
+      op = op + shl(parse_gpr(params[n]), 6); n = n + 1
     elseif p == "B" then
-      op = op + shll(parse_gpr(params[n]), 43); n = n + 1
-    elseif p == "C" then
-      op = op + shll(parse_gpr(params[n]), 12); n = n + 1
+      op = op + shl(parse_gpr(params[n]), 12); n = n + 1
     elseif p == "D" then
-      op = op + shll(parse_gpr(params[n]), 31); n = n + 1
+      op = op + parse_gpr(params[n]); n = n + 1
     elseif p == "O" then
       op = op + parse_rbo_x1_imm16(params[n]); n = n + 1
-    elseif p == "E" then
-      op = op + parse_gpr(params[n]); n = n + 1
-    elseif p == "F" then
-      op = op + shll(parse_gpr(params[n]), 6); n = n + 1
     elseif p == "G" then
-      op = op + shll(parse_imm(params[n], 6, 0, 0, false), 18); n = n + 1
+      op = op + shl(parse_imm(params[n], 6, 0, 0, false), 18); n = n + 1
     elseif p == "H" then
-      op = op + shll(parse_imm(params[n], 6, 0, 0, false), 12); n = n + 1
+      op = op + shl(parse_imm(params[n], 6, 0, 0, false), 12); n = n + 1
     elseif p == "I" then
-      op = op + shll(parse_imm(params[n], 16, 0, 0, true), 43); n = n + 1
+      op = op + shl(parse_imm(params[n], 16, 0, 0, true), 12); n = n + 1
     elseif p == "i" then
-      op = op + shll(parse_imm(params[n], 8, 0, 0, true), 43); n = n + 1
+      op = op + shl(parse_imm(params[n], 8, 0, 0, true), 12); n = n + 1
     elseif p == "K" then
       local mode, n, s = parse_label(params[n], false)
       waction("REL_"..mode.."_X1_BR", n, s, 1)
     elseif p == "J" then
       local mode, n, s = parse_label(params[n], false)
       waction("REL_"..mode.."_X1_J", n, s, 1)
-
-    -- Y mode
-    elseif p == "a" then
-      op = op + shll(parse_gpr(params[n]), 20); n = n + 1
-    elseif p == "b" then
-      op = op + shll(parse_gpr(params[n]), 51); n = n + 1
-    else
+     else
       assert(false)
     end
   end

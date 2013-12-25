@@ -7697,12 +7697,6 @@ if(bn.n==0.0&&!lua_isnumber(L,idx))luaL_typerror(L,idx,"number");
 return(UB)bn.b;
 }
 #define BRET(b)lua_pushnumber(L,(lua_Number)(int)(b));return 1;
-static ULB barg64(lua_State*L,int idx){
-union{lua_Number n;U64 b;}bn;
-bn.n=lua_tonumber(L,idx)+6755399441055744.0;
-if(bn.n==0.0&&!lua_isnumber(L,idx))luaL_typerror(L,idx,"number");
-return(ULB)bn.b;
-}
 #define BRET64(b)lua_pushnumber(L,(lua_Number)(long)(b));return 1;
 static int tobit(lua_State*L){
 BRET(barg(L,1))}
@@ -7716,9 +7710,6 @@ static int bxor(lua_State*L){
 int i;UB b=barg(L,1);for(i=lua_gettop(L);i>1;i--)b^=barg(L,i);BRET(b)}
 static int lshift(lua_State*L){
 UB b=barg(L,1),n=barg(L,2)&31;BRET(b<<n)}
-static long llshift(lua_State*L){
-ULB b=barg64(L,1) & 0xFFFFFFFF,n=barg64(L,2)&63;
-BRET64(b<<n)}
 static int rshift(lua_State*L){
 UB b=barg(L,1),n=barg(L,2)&31;BRET(b>>n)}
 static int arshift(lua_State*L){
@@ -7741,6 +7732,17 @@ for(i=(int)n;--i>=0;){buf[i]=hexdigits[b&15];b>>=4;}
 lua_pushlstring(L,buf,(size_t)n);
 return 1;
 }
+static int tobinary(lua_State*L){
+UB b=barg(L,1);
+int n=lua_isnone(L,2)?8:(int)barg(L,2);
+const char*bindigits="01";
+char buf[32];
+int i;
+if(n>32)n=32;
+for(i=(int)n;--i>=0;){buf[i]=bindigits[b&1];b>>=1;}
+lua_pushlstring(L,buf,(size_t)n);
+return 1;
+}
 static const struct luaL_Reg bitlib[]={
 {"tobit",tobit},
 {"bnot",bnot},
@@ -7754,7 +7756,7 @@ static const struct luaL_Reg bitlib[]={
 {"ror",ror},
 {"bswap",bswap},
 {"tohex",tohex},
-{"llshift",(lua_CFunction)llshift},
+{"tobinary",tobinary},
 {NULL,NULL}
 };
 int main(int argc,char**argv){

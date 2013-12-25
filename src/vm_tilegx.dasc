@@ -89,6 +89,425 @@
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
 |
+|.macro add, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_add_x1 a, b, c
+|.endmacro
+|
+|.macro sub, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_sub_x1 a, b, c
+|.endmacro
+|
+|.macro move, a, b
+|  B_X
+|    B_fnop_x0
+|    B_move_x1 a, b
+|.endmacro
+|
+|.macro movei, a, b
+|  B_X
+|    B_fnop_x0
+|    B_movei_x1 a, b
+|.endmacro
+|
+|.macro moveli, a, b
+|  B_X
+|    B_fnop_x0
+|    B_moveli_x1 a, b
+|.endmacro
+|
+|.macro addli, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_addli_x1 a, b, c
+|.endmacro
+|
+|.macro addlo, a, b
+|  B_X
+|    B_fnop_x0
+|    B_addlo_x1 a, b
+|.endmacro
+|
+|.macro shl16insli, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_shl16insli_x1 a, b, c
+|.endmacro
+|
+|.macro addi, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_addi_x1 a, b, c
+|.endmacro
+|
+|.macro and, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_and_x1 a, b, c
+|.endmacro
+|
+|.macro or, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_or_x1 a, b, c
+|.endmacro
+|
+|.macro nor, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_nor_x1 a, b, c
+|.endmacro
+|
+|.macro xor, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_xor_x1 a, b, c
+|.endmacro
+|
+|.macro xori, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_xori_x1 a, b, c
+|.endmacro
+|
+|.macro andi, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_andi_x1 a, b, c
+|.endmacro
+|
+|.macro ori, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_ori_x1 a, b, c
+|.endmacro
+|
+|.macro shl, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_shl_x1 a, b, c
+|.endmacro
+|
+|.macro shli, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_shli_x1 a, b, c
+|.endmacro
+|
+|.macro shru, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_shru_x1 a, b, c
+|.endmacro
+|
+|.macro shrui, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_shrui_x1 a, b, c
+|.endmacro
+|
+|.macro shrs, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_shrs_x1 a, b, c
+|.endmacro
+|
+|.macro shrsi, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_shrsi_x1 a, b, c
+|.endmacro
+|
+|.macro bfextu, a, b, c, d
+|  B_X
+|    B_bfextu_x0 a, b, c, d
+|    B_fnop_x1
+|.endmacro
+|
+|.macro bfexts, a, b, c, d
+|  B_X
+|    B_bfexts_x0 a, b, c, d
+|    B_fnop_x1
+|.endmacro
+|
+|.macro bfins, a, b, c, d
+|  B_X
+|    B_bfins_x0 a, b, c, d
+|    B_fnop_x1
+|.endmacro
+|
+|.macro cmovnez, a, b, c
+|  B_X
+|    B_cmovnez_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro cmoveqz, a, b, c
+|  B_X
+|    B_cmoveqz_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro st, a, b
+|  B_X
+|    B_fnop_x0
+|    B_st_x1 a, b
+|.endmacro
+|
+|.macro st4, a, b
+|  B_X
+|    B_fnop_x0
+|    B_st4_x1 a, b
+|.endmacro
+|
+|.macro st2, a, b
+|  B_X
+|    B_fnop_x0
+|    B_st2_x1 a, b
+|.endmacro
+|
+|.macro st1, a, b
+|  B_X
+|    B_fnop_x0
+|    B_st1_x1 a, b
+|.endmacro
+|
+|.macro ld, a, b
+|  B_X
+|    B_fnop_x0
+|    B_ld_x1 a, b
+|.endmacro
+|
+|.macro ld4u, a, b
+|  B_X
+|    B_fnop_x0
+|    B_ld4u_x1 a, b
+|.endmacro
+|
+|.macro ld2u, a, b
+|  B_X
+|    B_fnop_x0
+|    B_ld2u_x1 a, b
+|.endmacro
+|
+|.macro ld1u, a, b
+|  B_X
+|    B_fnop_x0
+|    B_ld1u_x1 a, b
+|.endmacro
+|
+|.macro ld1s, a, b
+|  B_X
+|    B_fnop_x0
+|    B_ld1s_x1 a, b
+|.endmacro
+|
+|.macro ld2s, a, b
+|  B_X
+|    B_fnop_x0
+|    B_ld2s_x1 a, b
+|.endmacro
+|
+|.macro ld4s, a, b
+|  B_X
+|    B_fnop_x0
+|    B_ld4s_x1 a, b
+|.endmacro
+|
+|.macro jr, a
+|  B_X
+|    B_fnop_x0
+|    B_jr_x1 a
+|.endmacro
+|
+|.macro jal, a
+|  B_X
+|    B_fnop_x0
+|    B_jal_x1 a
+|.endmacro
+|
+|.macro j, a
+|  B_X
+|    B_fnop_x0
+|    B_j_x1 a
+|.endmacro
+|
+|.macro jalr, a
+|  B_X
+|    B_fnop_x0
+|    B_jalr_x1 a
+|.endmacro
+|
+|.macro beqz, a, b
+|  B_X
+|    B_fnop_x0
+|    B_beqz_x1 a, b
+|.endmacro
+|
+|.macro bnez, a, b
+|  B_X
+|    B_fnop_x0
+|    B_bnez_x1 a, b
+|.endmacro
+|
+|.macro bltz, a, b
+|  B_X
+|    B_fnop_x0
+|    B_bltz_x1 a, b
+|.endmacro
+|
+|.macro blez, a, b
+|  B_X
+|    B_fnop_x0
+|    B_blez_x1 a, b
+|.endmacro
+|
+|.macro bgtz, a, b
+|  B_X
+|    B_fnop_x0
+|    B_bgtz_x1 a, b
+|.endmacro
+|
+|.macro bgez, a, b
+|  B_X
+|    B_fnop_x0
+|    B_bgez_x1 a, b
+|.endmacro
+|
+|.macro b, a
+|  B_X
+|    B_fnop_x0
+|    B_b_x1 a
+|.endmacro
+|
+|.macro lnk, a
+|  B_X
+|    B_fnop_x0
+|    B_lnk_x1 a
+|.endmacro
+|
+|.macro cmpeq, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_cmpeq_x1 a, b, c
+|.endmacro
+|
+|.macro cmpne, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_cmpne_x1 a, b, c
+|.endmacro
+|
+|.macro cmplts, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_cmplts_x1 a, b, c
+|.endmacro
+|
+|.macro cmpltu, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_cmpltu_x1 a, b, c
+|.endmacro
+|
+|.macro cmpleu, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_cmpleu_x1 a, b, c
+|.endmacro
+|
+|.macro cmpeqi, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_cmpeqi_x1 a, b, c
+|.endmacro
+|
+|.macro cmpltsi, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_cmpltsi_x1 a, b, c
+|.endmacro
+|
+|.macro cmpltui, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_cmpltui_x1 a, b, c
+|.endmacro
+|
+|.macro mul_hu_lu, a, b, c
+|  B_X
+|    B_mul_lu_lu_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro mul_lu_lu, a, b, c
+|  B_X
+|    B_mul_lu_lu_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro mul_hu_hu, a, b, c
+|  B_X
+|    B_mul_hu_hu_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro mula_hu_lu, a, b, c
+|  B_X
+|    B_mula_hu_lu_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro fdouble_pack1, a, b, c
+|  B_X
+|    B_fdouble_pack1_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro fdouble_pack2, a, b, c
+|  B_X
+|    B_fdouble_pack2_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro fdouble_add_flags, a, b, c
+|  B_X
+|    B_fdouble_add_flags_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro fdouble_sub_flags, a, b, c
+|  B_X
+|    B_fdouble_sub_flags_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro fdouble_mul_flags, a, b, c
+|  B_X
+|    B_fdouble_mul_flags_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro fdouble_addsub, a, b, c
+|  B_X
+|    B_fdouble_addsub_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro fdouble_unpack_min, a, b, c
+|  B_X
+|    B_fdouble_unpack_min_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro fdouble_unpack_max, a, b, c
+|  B_X
+|    B_fdouble_unpack_max_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
 |
 |.macro saveregs
 |  addi sp, sp, -40 // 8 + 32
@@ -190,11 +609,6 @@
 |
 |// Trap for not-yet-implemented parts.
 |.macro NYI; .long 0xf0f0f0f0; .endmacro
-|
-|// Macros to mark delay slots.
-|.macro ., a; a; .endmacro
-|.macro ., a,b; a,b; .endmacro
-|.macro ., a,b,c; a,b,c; .endmacro
 |
 |//-----------------------------------------------------------------------
 |
@@ -2603,10 +3017,10 @@ static void build_subroutines(BuildCtx *ctx)
   |.endif
   |
   |->vm_callhook:			// Dispatch target for call hooks.
+  |  move CARG2, PC
   |.if JIT
   |  b >1
   |.endif
-  |.  move CARG2, PC
   |
   |->vm_hotcall:			// Hot call counter underflow.
   |.if JIT
