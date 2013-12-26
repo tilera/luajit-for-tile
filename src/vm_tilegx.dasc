@@ -4,7 +4,7 @@
 |// Copyright (C) 2013-2013 Tilera Corporation. See Copyright Notice in luajit.h
 |
 |.arch tilegx
-|.section code_op, code_sub
+|.section code_sub, code_op
 |
 |.actionlist build_actionlist
 |.globals GLOB_
@@ -439,7 +439,7 @@
 |
 |.macro mul_hu_lu, a, b, c
 |  B_X
-|    B_mul_lu_lu_x0 a, b, c
+|    B_mul_hu_lu_x0 a, b, c
 |    B_fnop_x1
 |.endmacro
 |
@@ -2705,7 +2705,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  fdouble_addsub AT, AT2, AT1
   |  fdouble_pack1 CARG1, AT, AT1
   |  fdouble_pack2 CARG1, AT, zero
-  |  bfextu AT5, CARG1, 0, 31
+  |  bfexts AT5, CARG1, 0, 31
   |.endmacro
   |
   |.macro .ffunc_bit_op, name, ins
@@ -2734,7 +2734,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  fdouble_addsub AT, AT2, AT1
   |  fdouble_pack1 CARG1, AT, AT1
   |  fdouble_pack2 CARG1, AT, zero
-  |  bfextu CARG2, CARG1, 0, 31
+  |  bfexts CARG2, CARG1, 0, 31
   |  ins CRET1, AT5, CARG2
   |  addli TMP1, TMP1, 8
   |  b <1
@@ -2813,6 +2813,7 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_bit_sh ror, or, 2
   |
   |.ffunc_bit tobit
+  |  move CRET1, AT5
   |->fff_resi:
   |  cmpltsi AT, CRET1, 0
   |  sub AT1, zero, CRET1
