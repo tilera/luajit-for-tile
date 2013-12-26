@@ -7734,7 +7734,7 @@ return 1;
 }
 static int tobinary(lua_State*L){
 UB b=barg(L,1);
-int n=lua_isnone(L,2)?8:(int)barg(L,2);
+int n=lua_isnone(L,2)?32:(int)barg(L,2);
 const char*bindigits="01";
 char buf[32];
 int i;

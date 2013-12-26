@@ -105,35 +105,59 @@ local function writeactions(out, name)
       assert(out:write(tobinary(actlist[nnn], 31), "L,\n"))
       i = i + 3
     else
-      assert(out:write(tobinary(actlist[i], 31), "L,\n"))
+      assert(out:write("0b11111111111111111111111111111111", tobinary(actlist[i], 32), "L,\n"))
       i = i + 1
     end
   end
-  assert(out:write("0b", tobinary(actlist[nn], 32), "L\n};\n\n"))
+  assert(out:write("0b11111111111111111111111111111111", tobinary(actlist[nn], 32), "L\n};\n\n"))
 end
 
 ------------------------------------------------------------------------------
 
 -- Add word to action list.
 local function wputxw(n)
-  assert(n >= 0 and n <= 0xffffffffffffffff and n % 1 == 0, "word out of range")
+  assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range")
   actlist[#actlist+1] = n
 end
 
 -- Add action to list with optional arg. Advance buffer pos, too.
 local function waction(action, val, a, num)
   local w = assert(map_action[action], "bad action name `"..action.."'")
-  wputxw(0xff00000000000000 + w * 0x1000000000000 + (val or 0) * 0x1000)
+  wputxw(0xff000000 + w * 0x10000 + (val or 0))
   if a then actargs[#actargs+1] = a end
   if a or num then secpos = secpos + (num or 1) end
 end
 
 -- Flush action list (intervening C code or buffer pos overflow).
 local function wflush(term)
-  if #actlist == actargs[1] then return end -- Nothing to flush.
-  if not term then waction("STOP") end -- Terminate action list.
+  local nn = #actlist
+  local nnn = nn
+
+  if nn > 2 then
+  for i = 1,nn do
+    if (tobit(actlist[i]) == -1) then
+	    nnn = nnn - 2
+    else if (tobit(actlist[i]) == -2) then
+	    nnn = nnn - 3
+    else if (tobit(actlist[i]) == -3) then
+	    nnn = nnn - 3
+    else if (tobit(actlist[i]) == -4) then
+	    nnn = nnn - 3
+    end
+    end
+    end
+    end
+  end
+  end
+
+  if nnn == actargs[1] then return end -- Nothing to flush.
+  if not term then
+    waction("STOP")
+    nnn = nnn + 1
+  end -- Terminate action list.
   wline(format("dasm_put(Dst, %s);", concat(actargs, ", ")), true)
-  actargs = { #actlist } -- Actionlist offset is 1st arg to next dasm_put().
+
+  actargs = { nnn } -- Actionlist offset is 1st arg to next dasm_put().
   secpos = 1 -- The actionlist offset occupies a buffer position, too.
 end
 
@@ -152,7 +176,7 @@ end
 
 -- Store word to reserved position.
 local function wputpos(pos, n)
-  assert(n >= 0 and n <= 0xffffffffffffffff and n % 1 == 0, string.format("%016X", n).."word out of range")
+  assert(n >= 0 and n <= 0xffffffff and n % 1 == 0, "word out of range")
   actlist[pos] = n
 end
 
@@ -422,7 +446,7 @@ local function parse_imm(imm, bits, shift, scale, signed)
 	 match(imm, "^([%w_]+):([rf][1-3]?[0-9])$") then
     werror("expected immediate operand, got register")
   else
-    waction("IMM", (signed and 2147483648 or 0)+scale*67108864+bits*2097152+shift*65536, imm)
+    waction("IMM", (signed and 32768 or 0)+scale*1024+bits*32+shift, imm)
     return 0
   end
 end
@@ -432,7 +456,7 @@ local function parse_rbo_x1_imm16(disp)
   if reg and tailr ~= "" then
     local r, tp = parse_gpr(reg)
     if tp then
-      waction("IMM", 2147483648 + 16 * 2097152, format(tp.ctypefmt, tailr))
+      waction("IMM", 32768+16*32, format(tp.ctypefmt, tailr))
       return shl(r, 6)
     end
   end

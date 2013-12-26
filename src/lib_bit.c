@@ -62,6 +62,18 @@ LJLIB_CF(bit_tohex)
   return 1;
 }
 
+LJLIB_CF(bit_tobinary)
+{
+  uint32_t b = (uint32_t)lj_lib_checkbit(L, 1);
+  int32_t i, n = L->base+1 >= L->top ? 32 : lj_lib_checkbit(L, 2);
+  const char *bindigits = "01";
+  char buf[32];
+  if (n > 32) n = 32;
+  for (i = n; --i >= 0; ) { buf[i] = bindigits[b & 1]; b >>= 1; }
+  lua_pushlstring(L, buf, (size_t)n);
+  return 1;
+}
+
 /* ------------------------------------------------------------------------ */
 
 #include "lj_libdef.h"

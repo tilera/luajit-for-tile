@@ -188,7 +188,9 @@ void dasm_put(Dst_DECL, int start, ...)
   va_start(ap, start);
   while (1) {
     unsigned long ins = *p++;
-    unsigned int action = (ins >> 48) - 0xff00;
+    unsigned int action = ((ins >> 32) & 0xFFFFFFFF) != 0xFFFFFFFF
+	                   ? DASM__MAX + 1
+			     : (((ins >> 16) & 0xFFFF) - 0xFF00);
     if (action >= DASM__MAX) {
       ofs += 8;
     } else {
@@ -203,7 +205,7 @@ void dasm_put(Dst_DECL, int start, ...)
       case DASM_ALIGN: ofs += (ins & 255); b[pos++] = ofs; break;
       case DASM_REL_LG_X1_BR:
       case DASM_REL_LG_X1_J:
-	n = ((ins >> 12) & 0xFFF) - 10; pl = D->lglabels + n;
+	n = (ins & 0xFFFF) - 10; pl = D->lglabels + n;
 	/* Bkwd rel or global. */
 	if (n >= 0) { CK(n>=10||*pl<0, RANGE_LG); CKPL(lg, LG); goto putrel; }
 	pl += 10; n = *pl;
@@ -224,7 +226,7 @@ void dasm_put(Dst_DECL, int start, ...)
 	pos++;
 	break;
       case DASM_LABEL_LG:
-	pl = D->lglabels + (((ins >> 12) & 0xFFF) - 10);
+	pl = D->lglabels + ((ins & 0xFFFF) - 10);
 	CKPL(lg, LG); goto putlabel;
       case DASM_LABEL_PC:
 	pl = D->pclabels + n; CKPL(pc, PC);
@@ -236,7 +238,7 @@ void dasm_put(Dst_DECL, int start, ...)
 	b[pos++] = ofs;  /* Store pass1 offset estimate. */
 	break;
       case DASM_IMM:
-	n >>= ((ins>>38)&31);
+	n >>= ((ins>>10)&31);
 	b[pos++] = n;
 	break;
       }
@@ -286,7 +288,13 @@ int dasm_link(Dst_DECL, size_t *szp)
       dasm_ActList p = D->actionlist + b[pos++];
       while (1) {
 	unsigned long ins = *p++;
-	unsigned int action = (ins >> 48) - 0xff00;
+        unsigned int action = ((ins >> 32) & 0xFFFFFFFF) != 0xFFFFFFFF
+	                       ? DASM__MAX + 1
+			       : (((ins >> 16) & 0xFFFF) - 0xFF00);
+
+	if (action >= DASM__MAX)
+	  continue;
+
 	switch (action) {
 	case DASM_STOP: case DASM_SECTION: goto stop;
 	case DASM_ESC: p++; break;
@@ -333,7 +341,9 @@ int dasm_encode(Dst_DECL, void *buffer)
       dasm_ActList p = D->actionlist + *b++;
       while (1) {
 	unsigned long ins = *p++;
-	unsigned int action = (ins >> 48) - 0xff00;
+        unsigned int action = ((ins >> 32) & 0xFFFFFFFF) != 0xFFFFFFFF
+	                       ? DASM__MAX + 1
+			       : (((ins >> 16) & 0xFFFF) - 0xFF00);
 	long n = (action >= DASM_ALIGN && action < DASM__MAX) ? *b++ : 0;
 	switch (action) {
 	case DASM_STOP: case DASM_SECTION: goto stop;
@@ -370,12 +380,11 @@ int dasm_encode(Dst_DECL, void *buffer)
 
 	  break;
 	case DASM_LABEL_LG:
-	  ins = (ins >> 12) & 0xFFF; if (ins >= 20) D->globals[ins-10] = (void *)(base + n);
+	  ins = ins & 0xFFFF; if (ins >= 20) D->globals[ins-10] = (void *)(base + n);
 	  break;
 	case DASM_LABEL_PC: break;
 	case DASM_IMM:
-	  cp[-1] |= ((unsigned long)
-		     ((n & ((1<<((ins>>33)&31))-1)) << ((ins >> 28)&31))) << 43;
+	  cp[-1] |= ((unsigned long)((n & ((1<<((ins>>5)&31))-1)) << 43));
 	  break;
 	default: *cp++ = ins; break;
 	}
