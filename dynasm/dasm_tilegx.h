@@ -22,7 +22,7 @@ enum {
   /* The following actions need a buffer position. */
   DASM_ALIGN, DASM_REL_LG_X1_BR, DASM_REL_LG_X1_J, DASM_LABEL_LG,
   /* The following actions also have an argument. */
-  DASM_REL_PC_X1_BR, DASM_REL_PC_X1_J, DASM_LABEL_PC, DASM_IMM,
+  DASM_REL_PC_X1_BR, DASM_REL_PC_X1_J, DASM_LABEL_PC, DASM_IMM_X0, DASM_IMM_X1,
   DASM__MAX
 };
 
@@ -237,7 +237,8 @@ void dasm_put(Dst_DECL, int start, ...)
 	*pl = -pos;  /* Label exists now. */
 	b[pos++] = ofs;  /* Store pass1 offset estimate. */
 	break;
-      case DASM_IMM:
+      case DASM_IMM_X0:
+      case DASM_IMM_X1:
 	n >>= ((ins>>10)&31);
 	b[pos++] = n;
 	break;
@@ -303,7 +304,7 @@ int dasm_link(Dst_DECL, size_t *szp)
 	case DASM_REL_LG_X1_BR: case DASM_REL_LG_X1_J:
 	case DASM_REL_PC_X1_BR: case DASM_REL_PC_X1_J: pos++; break;
 	case DASM_LABEL_LG: case DASM_LABEL_PC: b[pos++] += ofs; break;
-	case DASM_IMM: pos++; break;
+	case DASM_IMM_X0: case DASM_IMM_X1: pos++; break;
 	}
       }
       stop: (void)0;
@@ -383,7 +384,10 @@ int dasm_encode(Dst_DECL, void *buffer)
 	  ins = ins & 0xFFFF; if (ins >= 20) D->globals[ins-10] = (void *)(base + n);
 	  break;
 	case DASM_LABEL_PC: break;
-	case DASM_IMM:
+	case DASM_IMM_X0:
+	  cp[-1] |= ((unsigned long)((n & ((1<<((ins>>5)&31))-1)) << 12));
+	  break;
+	case DASM_IMM_X1:
 	  cp[-1] |= ((unsigned long)((n & ((1<<((ins>>5)&31))-1)) << 43));
 	  break;
 	default: *cp++ = ins; break;

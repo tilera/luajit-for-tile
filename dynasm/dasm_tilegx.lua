@@ -28,7 +28,7 @@ local sub, format, byte, char = _s.sub, _s.format, _s.byte, _s.char
 local match, gmatch = _s.match, _s.gmatch
 local concat, sort = table.concat, table.sort
 local bit = bit or require("bit")
-local band, shl, sar, tobit, tobinary = bit.band, bit.lshift, bit.arshift, bit.tobit, bit.tobinary
+local band, shl, shr, sar, tobit, tobinary = bit.band, bit.lshift, bit.rshift, bit.arshift, bit.tobit, bit.tobinary
 
 -- Inherited tables and callbacks.
 local g_opt, g_arch
@@ -39,7 +39,7 @@ local wline, werror, wfatal, wwarn
 local action_names = {
   "STOP", "SECTION", "ESC", "REL_EXT",
   "ALIGN", "REL_LG_X1_BR", "REL_LG_X1_J", "LABEL_LG",
-  "REL_PC_X1_BR", "REL_PC_X1_J", "LABEL_PC", "IMM",
+  "REL_PC_X1_BR", "REL_PC_X1_J", "LABEL_PC", "IMM_X0", "IMM_X1"
 }
 
 -- Maximum number of section buffer positions for dasm_put().
@@ -82,15 +82,12 @@ local function writeactions(out, name)
   for i = 1,nn-1 do
     if (tobit(actlist[i]) == -1) then
 	    nnn = nnn - 2
-    else if (tobit(actlist[i]) == -2) then
+    elseif (tobit(actlist[i]) == -2) then
 	    nnn = nnn - 3
-    else if (tobit(actlist[i]) == -3) then
+    elseif (tobit(actlist[i]) == -3) then
 	    nnn = nnn - 3
-    else if (tobit(actlist[i]) == -4) then
+    elseif (tobit(actlist[i]) == -4) then
 	    nnn = nnn - 3
-    end
-    end
-    end
     end
   end
   out:write("static const unsigned long ", name, "[", nnn, "] = {\n")
@@ -100,10 +97,20 @@ local function writeactions(out, name)
     if (tobit(actlist[i]) == -1) then
       assert(out:write("0b00"))
       nnn = i + 2 -- X1
-      assert(out:write(tobinary(actlist[nnn], 31)))
-      nnn = i + 1 -- X0
-      assert(out:write(tobinary(actlist[nnn], 31), "L,\n"))
-      i = i + 3
+      if (tobit(actlist[nnn]) >= 0) then
+        assert(out:write(tobinary(actlist[nnn], 31)))
+        nnn = i + 1 -- X0
+        assert(out:write(tobinary(actlist[nnn], 31), "L,\n"))
+        i = i + 3
+      else -- X0 has an accompany relocation which occupies X1 slot.
+        nnn = i + 3 -- X1
+        assert(out:write(tobinary(actlist[nnn], 31)))
+        nnn = i + 1 -- X0
+        assert(out:write(tobinary(actlist[nnn], 31), "L,\n"))
+        nnn = i + 2 -- X0 relocation
+        assert(out:write("0b11111111111111111111111111111111", tobinary(actlist[nnn], 32), "L,\n"))
+        i = i + 4
+      end
     else
       assert(out:write("0b11111111111111111111111111111111", tobinary(actlist[i], 32), "L,\n"))
       i = i + 1
@@ -137,15 +144,12 @@ local function wflush(term)
   for i = 1,nn do
     if (tobit(actlist[i]) == -1) then
 	    nnn = nnn - 2
-    else if (tobit(actlist[i]) == -2) then
+    elseif (tobit(actlist[i]) == -2) then
 	    nnn = nnn - 3
-    else if (tobit(actlist[i]) == -3) then
+    elseif (tobit(actlist[i]) == -3) then
 	    nnn = nnn - 3
-    else if (tobit(actlist[i]) == -4) then
+    elseif (tobit(actlist[i]) == -4) then
 	    nnn = nnn - 3
-    end
-    end
-    end
     end
   end
   end
@@ -284,128 +288,139 @@ end
 -- "I": Imm16 in X slot.
 -- "i": Imm8 in X slot.
 
+-- template[9]
+-- "0": Start of X bundle.
+-- "1": In X bundle.
+-- "2": End of X bundle.
+-- "3": Start of Y bundle.
+-- "4": In Y bundle.
+-- "5": End of Y bundle.
+
 local map_op = {
   -- Bundle Markers.
-  B_X_0 =	"FFFFFFFF",
-  B_Y0_0 =	"FFFFFFFE",
-  B_Y1_0 =	"FFFFFFFD",
-  B_Y2_0 =	"FFFFFFFC",
+  B_X_0 =	"FFFFFFFF0",
+  B_Y0_0 =	"FFFFFFFE3",
+  B_Y1_0 =	"FFFFFFFD3",
+  B_Y2_0 =	"FFFFFFFC3",
 
   -- Arithmetic Instructions.
-  B_move_x0_2 =		"5107F000DA",
-  B_move_x1_2 =		"5077F000DA",
-  B_add_x0_3 =		"500C0000DAB",
-  B_add_x1_3 =		"500C0000DAB",
-  B_addi_x0_3 =		"40100000DAi",
-  B_addi_x1_3 =		"30100000DAi",
-  B_addli_x0_3 =	"10000000DAI",
-  B_addli_x1_3 =	"00000000DAI",
-  B_moveli_x0_2 =	"10000FC0DI",
-  B_moveli_x1_2 =	"00000FC0DI",
-  B_movei_x0_2 =	"40100FC0DI",
-  B_movei_x1_2 =	"30100FC0DI",
-  B_addlo_x0_2 =	"10000000DO",
-  B_addlo_x1_2 =	"00000000DO",
-  B_shl16insli_x0_3 =	"70000000DAI",
-  B_shl16insli_x1_3 =	"70000000DAI",
-  B_sub_x0_3 =		"51440000DAB",
-  B_sub_x1_3 =		"50D00000DAB",
+  B_move_x0_2 =		"5107F0001DA",
+  B_move_x1_2 =		"5077F0002DA",
+  B_add_x0_3 =		"500C00001DAB",
+  B_add_x1_3 =		"500C00002DAB",
+  B_addi_x0_3 =		"401000001DAe",
+  B_addi_x1_3 =		"301000002DAE",
+  B_addli_x0_3 =	"100000001DAi",
+  B_addli_x1_3 =	"000000002DAI",
+  B_moveli_x0_2 =	"10000FC01Di",
+  B_moveli_x1_2 =	"00000FC02DI",
+  B_movei_x0_2 =	"40100FC01Di",
+  B_movei_x1_2 =	"30100FC02DI",
+  B_addlo_x0_2 =	"100000001Do",
+  B_addlo_x1_2 =	"000000002DO",
+  B_shl16insli_x0_3 =	"700000001DAi",
+  B_shl16insli_x1_3 =	"700000002DAI",
+  B_sub_x0_3 =		"514400001DAB",
+  B_sub_x1_3 =		"50D000002DAB",
 
   -- Logical Instructions.
-  B_and_x0_3 =		"50100000DAB",
-  B_and_x1_3 =		"50100000DAB",
-  B_or_x0_3 =		"51040000DAB",
-  B_or_x1_3 =		"50740000DAB",
-  B_nor_x0_3 =		"51000000DAB",
-  B_nor_x1_3 =		"50700000DAB",
-  B_xor_x0_3 =		"52800000DAB",
-  B_xor_x1_3 =		"51AC0000DAB",
-  B_xori_x0_3 =		"41400000DAi",
-  B_xori_x1_3 =		"32D00000DAi",
-  B_andi_x0_3 =		"40300000DAi",
-  B_andi_x1_3 =		"30300000DAi",
-  B_ori_x0_3 =		"40700000DAi",
-  B_ori_x1_3 =		"31800000DAi",
-  B_shl_x0_3 =		"51280000DAB",
-  B_shl_x1_3 =		"50980000DAB",
-  B_shli_x0_3 =		"60080000DAi",
-  B_shli_x1_3 =		"60080000DAi",
-  B_shru_x0_3 =		"51340000DAB",
-  B_shru_x1_3 =		"50A40000DAB",
-  B_shrui_x0_3 =	"60140000DAi",
-  B_shrui_x1_3 =	"60140000DAi",
-  B_shrs_x0_3 =		"512C0000DAB",
-  B_shrs_x1_3 =		"509C0000DAB",
-  B_shrsi_x0_3 =	"60100000DAi",
-  B_shrsi_x1_3 =	"60100000DAi",
-  B_bfextu_x0_4 =	"35000000DAGH",
-  B_bfexts_x0_4 =	"34000000DAGH",
-  B_bfins_x0_4 =	"36000000DAGH",
-  B_cmoveqz_x0_3 =	"50140000DAB",
-  B_cmovnez_x0_3 =	"50180000DAB",
+  B_and_x0_3 =		"501000001DAB",
+  B_and_x1_3 =		"501000002DAB",
+  B_or_x0_3 =		"510400001DAB",
+  B_or_x1_3 =		"507400002DAB",
+  B_nor_x0_3 =		"510000001DAB",
+  B_nor_x1_3 =		"507000002DAB",
+  B_xor_x0_3 =		"528000001DAB",
+  B_xor_x1_3 =		"51AC00002DAB",
+  B_xori_x0_3 =		"414000001DAe",
+  B_xori_x1_3 =		"32D000002DAE",
+  B_andi_x0_3 =		"403000001DAe",
+  B_andi_x1_3 =		"303000002DAE",
+  B_ori_x0_3 =		"407000001DAe",
+  B_ori_x1_3 =		"318000002DAE",
+  B_shl_x0_3 =		"512800001DAB",
+  B_shl_x1_3 =		"509800002DAB",
+  B_shli_x0_3 =		"600800001DAe",
+  B_shli_x1_3 =		"600800002DAE",
+  B_shru_x0_3 =		"513400001DAB",
+  B_shru_x1_3 =		"50A400002DAB",
+  B_shrui_x0_3 =	"601400001DAe",
+  B_shrui_x1_3 =	"601400002DAE",
+  B_shrs_x0_3 =		"512C00001DAB",
+  B_shrs_x1_3 =		"509C00002DAB",
+  B_shrsi_x0_3 =	"601000001DAe",
+  B_shrsi_x1_3 =	"601000002DAE",
+  B_bfextu_x0_4 =	"350000001DAGH",
+  B_bfexts_x0_4 =	"340000001DAGH",
+  B_bfins_x0_4 =	"360000001DAGH",
+  B_cmoveqz_x0_3 =	"501400001DAB",
+  B_cmovnez_x0_3 =	"501800001DAB",
 
   -- Memory Instructions.
-  B_st_x1_2 =		"50C40000AB",
-  B_st4_x1_2 =		"50B00000AB",
-  B_st2_x1_2 =		"50AC0000AB",
-  B_st1_x1_2 =		"50A80000AB",
-  B_ld_x1_2 =		"50D5D000DA",
-  B_ld4u_x1_2 =		"50D54000DA",
-  B_ld4s_x1_2 =		"50D53000DA",
-  B_ld2u_x1_2 =		"50D52000DA",
-  B_ld2s_x1_2 =		"50D51000DA",
-  B_ld1u_x1_2 =		"50D50000DA",
-  B_ld1s_x1_2 =		"50D4F000DA",
+  B_st_x1_2 =		"50C400002AB",
+  B_st4_x1_2 =		"50B000002AB",
+  B_st2_x1_2 =		"50AC00002AB",
+  B_st1_x1_2 =		"50A800002AB",
+  B_st_add_x1_3 =	"320000002ABz",
+  B_ld_x1_2 =		"50D5D0002DA",
+  B_ld4u_x1_2 =		"50D540002DA",
+  B_ld4s_x1_2 =		"50D530002DA",
+  B_ld2u_x1_2 =		"50D520002DA",
+  B_ld2s_x1_2 =		"50D510002DA",
+  B_ld1u_x1_2 =		"50D500002DA",
+  B_ld1s_x1_2 =		"50D4F0002DA",
+  B_ld_add_x1_3 =	"314000002DAE",
+  B_ld4u_add_x1_3 =	"30c000002DAE",
 
   -- Control Instructions.
-  B_j_x1_1 =		"48000000J",
-  B_jr_x1_1 =		"50D4E000A",
-  B_jal_x1_1 =		"40000000J",
-  B_jalr_x1_1 =		"50D4C000A",
-  B_b_x1_1 =		"28800FC0K",
-  B_beqz_x1_2 =		"28800000AK",
-  B_bnez_x1_2 =		"2F800000AK",
-  B_bltz_x1_2 =		"2E800000AK",
-  B_blez_x1_2 =		"2D800000AK",
-  B_bgtz_x1_2 =		"2A800000AK",
-  B_bgez_x1_2 =		"29800000AK",
-  B_lnk_x1_1 =		"50D5E000D",
+  B_j_x1_1 =		"480000002J",
+  B_jr_x1_1 =		"50D4E0002A",
+  B_jal_x1_1 =		"400000002J",
+  B_jalr_x1_1 =		"50D4C0002A",
+  B_b_x1_1 =		"28800FC02K",
+  B_beqz_x1_2 =		"288000002AK",
+  B_bnez_x1_2 =		"2F8000002AK",
+  B_bltz_x1_2 =		"2E8000002AK",
+  B_blez_x1_2 =		"2D8000002AK",
+  B_bgtz_x1_2 =		"2A8000002AK",
+  B_bgez_x1_2 =		"298000002AK",
+  B_lnk_x1_1 =		"50D5E0002D",
 
   -- Compare Instructions.
-  B_cmpeq_x0_3 =	"501C0000DAB",
-  B_cmpeq_x1_3 =	"50140000DAB",
-  B_cmpne_x0_3 =	"50300000DAB",
-  B_cmpne_x1_3 =	"50300000DAB",
-  B_cmplts_x0_3 =	"50280000DAB",
-  B_cmplts_x1_3 =	"50280000DAB",
-  B_cmpltu_x0_3 =	"502C0000DAB",
-  B_cmpltu_x1_3 =	"502C0000DAB",
-  B_cmpleu_x0_3 =	"50240000DAB",
-  B_cmpleu_x1_3 =	"50240000DAB",
-  B_cmpeqi_x0_3 =	"40400000DAi",
-  B_cmpeqi_x1_3 =	"30400000DAi",
-  B_cmpltsi_x0_3 =	"40500000DAi",
-  B_cmpltsi_x1_3 =	"30500000DAi",
-  B_cmpltui_x0_3 =	"40600000DAi",
-  B_cmpltui_x1_3 =	"30600000DAi",
+  B_cmpeq_x0_3 =	"501C00001DAB",
+  B_cmpeq_x1_3 =	"501400002DAB",
+  B_cmpne_x0_3 =	"503000001DAB",
+  B_cmpne_x1_3 =	"503000002DAB",
+  B_cmplts_x0_3 =	"502800001DAB",
+  B_cmplts_x1_3 =	"502800002DAB",
+  B_cmpltu_x0_3 =	"502C00001DAB",
+  B_cmpltu_x1_3 =	"502C00002DAB",
+  B_cmpleu_x0_3 =	"502400001DAB",
+  B_cmpleu_x1_3 =	"502400002DAB",
+  B_cmpeqi_x0_3 =	"404000001DAe",
+  B_cmpeqi_x1_3 =	"304000002DAE",
+  B_cmpltsi_x0_3 =	"405000001DAe",
+  B_cmpltsi_x1_3 =	"305000002DAE",
+  B_cmpltui_x0_3 =	"406000001DAe",
+  B_cmpltui_x1_3 =	"306000002DAE",
 
   -- Float
-  B_mul_hu_lu_x0_3 =	"50EC0000DAB",
-  B_mul_lu_lu_x0_3 =	"50F80000DAB",
-  B_mul_hu_hu_x0_3 =	"50E40000DAB",
-  B_mula_hu_lu_x0_3 =	"50C00000DAB",
-  B_fdouble_pack1_x0_3 =	"50740000DAB",
-  B_fdouble_pack2_x0_3 =	"50780000DAB",
-  B_fdouble_add_flags_x0_3 =	"506C0000DAB",
-  B_fdouble_sub_flags_x0_3 =	"507C0000DAB",
-  B_fdouble_mul_flags_x0_3 =	"50700000DAB",
-  B_fdouble_addsub_x0_3 =	"50680000DAB",
-  B_fdouble_unpack_min_x0_3 =	"50840000DAB",
-  B_fdouble_unpack_max_x0_3 =	"50800000DAB",
+  B_mul_hu_lu_x0_3 =	"50EC00001DAB",
+  B_mul_lu_lu_x0_3 =	"50F800001DAB",
+  B_mul_hu_hu_x0_3 =	"50E400001DAB",
+  B_mula_hu_lu_x0_3 =	"50C000001DAB",
+  B_fdouble_pack1_x0_3 =	"507400001DAB",
+  B_fdouble_pack2_x0_3 =	"507800001DAB",
+  B_fdouble_add_flags_x0_3 =	"506C00001DAB",
+  B_fdouble_sub_flags_x0_3 =	"507C00001DAB",
+  B_fdouble_mul_flags_x0_3 =	"507000001DAB",
+  B_fdouble_addsub_x0_3 =	"506800001DAB",
+  B_fdouble_unpack_min_x0_3 =	"508400001DAB",
+  B_fdouble_unpack_max_x0_3 =	"508000001DAB",
 
   -- Float
-  B_fnop_x0_0 =		"51483000",
-  B_fnop_x1_0 =		"50D46000",
+  B_fnop_x0_0 =		"514830001",
+  B_fnop_x1_0 =		"50D460002",
 }
 
 ------------------------------------------------------------------------------
@@ -428,7 +443,7 @@ local function parse_gpr(expr)
   werror("bad register name `"..expr.."'")
 end
 
-local function parse_imm(imm, bits, shift, scale, signed)
+local function parse_imm(imm, bits, shift, scale, signed, slot)
   local n = tonumber(imm)
   if n then
     local m = sar(n, scale)
@@ -445,18 +460,25 @@ local function parse_imm(imm, bits, shift, scale, signed)
   elseif match(imm, "^[rf]([1-3]?[0-9])$") or
 	 match(imm, "^([%w_]+):([rf][1-3]?[0-9])$") then
     werror("expected immediate operand, got register")
+  elseif slot == 0 then
+    waction("IMM_X0", (signed and 32768 or 0)+scale*1024+bits*32+shift, imm)
+    return 0
   else
-    waction("IMM", (signed and 32768 or 0)+scale*1024+bits*32+shift, imm)
+    waction("IMM_X1", (signed and 32768 or 0)+scale*1024+bits*32+shift, imm)
     return 0
   end
 end
 
-local function parse_rbo_x1_imm16(disp)
+local function parse_rbo_x1_imm16(disp, slot)
   local reg, tailr = match(disp, "^([%w_:]+)%s*(.*)$")
   if reg and tailr ~= "" then
     local r, tp = parse_gpr(reg)
     if tp then
-      waction("IMM", 32768+16*32, format(tp.ctypefmt, tailr))
+      if slot == 0 then
+        waction("IMM_X0", 32768+16*32, format(tp.ctypefmt, tailr))
+      else
+        waction("IMM_X1", 32768+16*32, format(tp.ctypefmt, tailr))
+      end
       return shl(r, 6)
     end
   end
@@ -495,6 +517,7 @@ end
 
 ------------------------------------------------------------------------------
 
+local bundle_status = "0"
 -- bundle version
 map_op[".template__"] = function(params, template, nparams)
   local op = tonumber(sub(template, 1, 8), 16)
@@ -502,11 +525,18 @@ map_op[".template__"] = function(params, template, nparams)
 
   -- Limit number of section buffer positions used by a single dasm_put().
   -- A single opcode needs a maximum of 2 positions (ins/ext).
-  if secpos+2 > maxsecpos then wflush() end
+  if secpos+2 > maxsecpos and bundle_status == "0" then wflush() end
   local pos = wpos()
 
+  local bundle_flag = sub(template, 9, 9)
+  if bundle_flag == "1" or bundle_flag == "4" then
+    bundle_status = "1"
+  elseif bundle_flag == "2" or bundle_flag == "5" then
+    bundle_status = "0"
+  end
+
   -- Process each character.
-  for p in gmatch(sub(template, 9), ".") do
+  for p in gmatch(sub(template, 10), ".") do
 
     -- X mode
     if p == "A" then
@@ -516,15 +546,24 @@ map_op[".template__"] = function(params, template, nparams)
     elseif p == "D" then
       op = op + parse_gpr(params[n]); n = n + 1
     elseif p == "O" then
-      op = op + parse_rbo_x1_imm16(params[n]); n = n + 1
+      op = op + parse_rbo_x1_imm16(params[n], 1); n = n + 1
+    elseif p == "o" then
+      op = op + parse_rbo_x1_imm16(params[n], 0); n = n + 1
     elseif p == "G" then
-      op = op + shl(parse_imm(params[n], 6, 0, 0, false), 18); n = n + 1
+      op = op + shl(parse_imm(params[n], 6, 0, 0, false, 1), 18); n = n + 1
     elseif p == "H" then
-      op = op + shl(parse_imm(params[n], 6, 0, 0, false), 12); n = n + 1
+      op = op + shl(parse_imm(params[n], 6, 0, 0, false, 1), 12); n = n + 1
     elseif p == "I" then
-      op = op + shl(parse_imm(params[n], 16, 0, 0, true), 12); n = n + 1
+      op = op + shl(parse_imm(params[n], 16, 0, 0, true, 1), 12); n = n + 1
     elseif p == "i" then
-      op = op + shl(parse_imm(params[n], 8, 0, 0, true), 12); n = n + 1
+      op = op + shl(parse_imm(params[n], 16, 0, 0, true, 0), 12); n = n + 1
+    elseif p == "E" then
+      op = op + shl(parse_imm(params[n], 8, 0, 0, true, 1), 12); n = n + 1
+    elseif p == "e" then
+      op = op + shl(parse_imm(params[n], 8, 0, 0, true, 0), 12); n = n + 1
+    elseif p == "z" then -- no relocation support for 'z' yet
+      local tmp = parse_imm(params[n], 8, 0, 0, true, 1)
+      op = op + band(tmp, 0x3F) + shl(band(shr(tmp, 6), 0x3), 18) ; n = n + 1
     elseif p == "K" then
       local mode, n, s = parse_label(params[n], false)
       waction("REL_"..mode.."_X1_BR", n, s, 1)

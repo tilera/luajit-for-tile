@@ -11,8 +11,7 @@
 |.globalnames globnames
 |.externnames extnames
 |
-|// Note: The ragged indentation of the instructions is intentional.
-|//       The starting columns indicate data dependencies.
+|// Note: currently, at most one relocation is allowed in one bundle.
 |
 |//-----------------------------------------------------------------------
 |
@@ -257,6 +256,12 @@
 |    B_st_x1 a, b
 |.endmacro
 |
+|.macro st_add, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_st_add_x1 a, b, c
+|.endmacro
+|
 |.macro st4, a, b
 |  B_X
 |    B_fnop_x0
@@ -279,6 +284,18 @@
 |  B_X
 |    B_fnop_x0
 |    B_ld_x1 a, b
+|.endmacro
+|
+|.macro ld_add, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_ld_add_x1 a, b, c
+|.endmacro
+|
+|.macro ld4u_add, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_ld4u_add_x1 a, b, c
 |.endmacro
 |
 |.macro ld4u, a, b
@@ -511,82 +528,46 @@
 |
 |.macro saveregs
 |  addi sp, sp, -40 // 8 + 32
-|  st sp, r30
-|  addi sp, sp, -8
-|  st sp, r31
-|  addi sp, sp, -8
-|  st sp, r32
-|  addi sp, sp, -8
-|  st sp, r33
-|  addi sp, sp, -8
-|  st sp, r34
-|  addi sp, sp, -8
-|  st sp, r35
-|  addi sp, sp, -8
-|  st sp, r36
-|  addi sp, sp, -8
-|  st sp, r37
-|  addi sp, sp, -8
-|  st sp, r38
-|  addi sp, sp, -8
-|  st sp, r39
-|  addi sp, sp, -8
-|  st sp, r40
-|  addi sp, sp, -8
-|  st sp, r41
-|  addi sp, sp, -8
-|  st sp, r42
-|  addi sp, sp, -8
-|  st sp, r43
-|  addi sp, sp, -8
-|  st sp, r44
-|  addi sp, sp, -8
-|  st sp, r45
-|  addi sp, sp, -8
-|  st sp, r52
-|  addi sp, sp, -8
-|  st sp, lr
-|  addi sp, sp, -TILE_ABI_RESERV
+|  st_add sp, r30, -8
+|  st_add sp, r31, -8
+|  st_add sp, r32, -8
+|  st_add sp, r33, -8
+|  st_add sp, r34, -8
+|  st_add sp, r35, -8
+|  st_add sp, r36, -8
+|  st_add sp, r37, -8
+|  st_add sp, r38, -8
+|  st_add sp, r39, -8
+|  st_add sp, r40, -8
+|  st_add sp, r41, -8
+|  st_add sp, r42, -8
+|  st_add sp, r43, -8
+|  st_add sp, r44, -8
+|  st_add sp, r45, -8
+|  st_add sp, r52, -8
+|  st_add sp, lr, -TILE_ABI_RESERV
 |.endmacro
 |
 |.macro restoreregs_ret
 |  addi sp, sp, TILE_ABI_RESERV
-|  ld lr, sp
-|  addi sp, sp, 8
-|  ld r52, sp
-|  addi sp, sp, 8
-|  ld r45, sp
-|  addi sp, sp, 8
-|  ld r44, sp
-|  addi sp, sp, 8
-|  ld r43, sp
-|  addi sp, sp, 8
-|  ld r42, sp
-|  addi sp, sp, 8
-|  ld r41, sp
-|  addi sp, sp, 8
-|  ld r40, sp
-|  addi sp, sp, 8
-|  ld r39, sp
-|  addi sp, sp, 8
-|  ld r38, sp
-|  addi sp, sp, 8
-|  ld r37, sp
-|  addi sp, sp, 8
-|  ld r36, sp
-|  addi sp, sp, 8
-|  ld r35, sp
-|  addi sp, sp, 8
-|  ld r34, sp
-|  addi sp, sp, 8
-|  ld r33, sp
-|  addi sp, sp, 8
-|  ld r32, sp
-|  addi sp, sp, 8
-|  ld r31, sp
-|  addi sp, sp, 8
-|  ld r30, sp
-|  addi sp, sp, 40
+|  ld_add lr, sp, 8
+|  ld_add r52, sp, 8
+|  ld_add r45, sp, 8
+|  ld_add r44, sp, 8
+|  ld_add r43, sp, 8
+|  ld_add r42, sp, 8
+|  ld_add r41, sp, 8
+|  ld_add r40, sp, 8
+|  ld_add r39, sp, 8
+|  ld_add r38, sp, 8
+|  ld_add r37, sp, 8
+|  ld_add r36, sp, 8
+|  ld_add r35, sp, 8
+|  ld_add r34, sp, 8
+|  ld_add r33, sp, 8
+|  ld_add r32, sp, 8
+|  ld_add r31, sp, 8
+|  ld_add r30, sp, 40
 |  jr lr
 |.endmacro
 |
@@ -637,20 +618,32 @@
 |
 |// Instruction fetch.
 |.macro ins_NEXT1
-|  ld4u INS, PC
-|   addi PC, PC, 4
+|  ld4u_add INS, PC, 4
 |.endmacro
+|
 |// Instruction decode+dispatch.
 |.macro ins_NEXT2
 |  decode_OP4a TMP1, INS
 |  decode_OP4b TMP1
-|  add TMP0, DISPATCH, TMP1
-|   decode_RD8a RD, INS
-|  ld AT, TMP0
-|   decode_RA8a RA, INS
-|   decode_RD8b RD
-|   decode_RA8b RA
-|  jr AT
+|  //add TMP0, DISPATCH, TMP1
+|  //decode_RD8a RD, INS
+|  B_X
+|    B_add_x0 TMP0, DISPATCH, TMP1
+|    B_shrui_x1 RD, INS, 16
+|  //ld AT, TMP0
+|  //decode_RA8a RA, INS
+|  //decode_RD8b RD
+|  //decode_RA8b RA
+|  //jr AT
+|  B_X
+|    B_shrui_x0, RA, INS, 5
+|    B_ld_x1, AT, TMP0
+|  B_X
+|    B_bfextu_x0, RA, RA, 3, 10
+|    B_shli_x1, RD, RD, 3
+|  B_X
+|    B_shli_x0, RA, RA, 3
+|    B_jr_x1, AT
 |.endmacro
 |.macro ins_NEXT
 |  ins_NEXT1
@@ -686,30 +679,51 @@
 |  // BASE = new base, RB = LFUNC/CFUNC, RC = nargs*8, FRAME_PC(BASE) = PC
 |  addlo PC, LFUNC:RB->pc
 |  ld4u PC, PC
-|  ld4u INS, PC
-|   addi PC, PC, 4
-|  decode_OP4a TMP1, INS
-|   decode_RA8a RA, INS
-|  decode_OP4b TMP1
-|   decode_RA8b RA
-|  add TMP0, DISPATCH, TMP1
-|  ld TMP0, TMP0
-|  add RA, RA, BASE
+|  ld4u_add INS, PC, 4
+|  B_X
+|    B_bfextu_x0 TMP1, INS, 0, 7
+|    B_shrui_x1 RA, INS, 5
+|  B_X
+|    B_bfextu_x0 RA, RA, 3, 10
+|    B_shli_x1 TMP1, TMP1, 3
+|  B_X
+|    B_shli_x0 RA, RA, 3
+|    B_add_x1 TMP0, DISPATCH, TMP1
+|  B_X
+|    B_add_x0 RA, RA, BASE
+|    B_ld_x1 TMP0, TMP0
 |  jr TMP0
 |.endmacro
 |
 |.macro ins_call
 |  // BASE = new base, RB = LFUNC/CFUNC, RC = nargs*8, PC = caller PC
 |  addi AT, BASE, FRAME_PC
-|  st4 AT, PC
-|  ins_callt
+|  B_X
+|    B_addlo_x0 AT2, LFUNC:RB->pc
+|    B_st4_x1 AT, PC
+|  ld4u PC, AT2
+|  ld4u_add INS, PC, 4
+|  B_X
+|    B_bfextu_x0 TMP1, INS, 0, 7
+|    B_shrui_x1 RA, INS, 5
+|  B_X
+|    B_bfextu_x0 RA, RA, 3, 10
+|    B_shli_x1 TMP1, TMP1, 3
+|  B_X
+|    B_shli_x0 RA, RA, 3
+|    B_add_x1 TMP0, DISPATCH, TMP1
+|  B_X
+|    B_add_x0 RA, RA, BASE
+|    B_ld_x1 TMP0, TMP0
+|  jr TMP0
 |.endmacro
 |
 |//-----------------------------------------------------------------------
 |
 |.macro branch_RD
-|  shrui TMP0, RD, 1
-|  moveli AT, (-(BCBIAS_J*4 >> 16) & 65535)
+|  B_X
+|    B_shrui_x0 TMP0, RD, 1
+|    B_moveli_x1 AT, (-(BCBIAS_J*4 >> 16) & 65535)
 |  shl16insli AT, AT, 0
 |  add TMP0, TMP0, AT
 |  add PC, PC, TMP0
@@ -760,13 +774,16 @@
 |// Move table write barrier back. Overwrites mark and tmp.
 |.macro barrierback, tab, mark, tmp, target
 |  addli tmp, DISPATCH, DISPATCH_GL(gc.grayagain)
-|  ld4u tmp, tmp
-|   andi mark, mark, ~LJ_GC_BLACK & 255		// black2gray(tab)
+|  B_X
+|    B_andi_x0 mark, mark, ~LJ_GC_BLACK & 255
+|    B_ld4u_x1 tmp, tmp
 |  addli AT, DISPATCH, DISPATCH_GL(gc.grayagain)
-|  st4 AT, tab
-|   addlo AT, tab->marked
-|   st1 AT, mark
-|   addlo AT, tab->gclist
+|  B_X
+|    B_addlo_x0 AT2, tab->marked
+|    B_st4_x1 AT, tab
+|  B_X
+|    B_addlo_x0 AT, tab->gclist
+|    B_st1_x1 AT2, mark
 |  st4 AT, tmp
 |  b target
 |.endmacro
@@ -785,10 +802,12 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vm_returnp:
   |  // See vm_return. Also: TMP2 = previous base.
-  |  lnk ASMENTRY
-  |  andi AT, PC, FRAME_P
-  |  addi TMP1, zero, LJ_TTRUE
-  |  beqz AT, ->cont_dispatch
+  |  B_X
+  |    B_andi_x0 AT, PC, FRAME_P
+  |    B_lnk_x1 ASMENTRY
+  |  B_X
+  |    B_addi_x0 TMP1, zero, -3 //LJ_TTRUE
+  |    B_beqz_x1 AT, ->cont_dispatch
   |
   |  // Return from pcall or xpcall fast func.
   |  addi PC, TMP2, FRAME_PC
