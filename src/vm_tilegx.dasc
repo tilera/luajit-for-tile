@@ -1288,20 +1288,29 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi TMP0, BASE, -16+LO
   |  ld4s TMP0, TMP0
   |  add TMP0, TMP0, ASMENTRY
-  |  addi TMP0, TMP0, -8
-  |   move RB, BASE
-  |   move BASE, TMP2			// Restore caller BASE.
-  |    addi LFUNC:TMP1, TMP2, FRAME_FUNC
-  |    ld4s LFUNC:TMP1, LFUNC:TMP1
+  |  B_X
+  |    B_addi_x0 TMP0, TMP0, -8
+  |    B_move_x1 RB, BASE
+  |  B_X
+  |    B_move_x0 BASE, TMP2			// Restore caller BASE.
+  |    B_addi_x1 LFUNC:TMP1, TMP2, FRAME_FUNC
   |.if FFI
-  |  cmpltui AT, TMP0, 2
+  |  B_X
+  |    B_cmpltui_x0 AT, TMP0, 2
+  |    B_ld4s_x1 LFUNC:TMP1, LFUNC:TMP1
+  |  addi PC, RB, -16+HI
+  |.else  
+  |  B_X
+  |    B_addi_x0 PC, RB, -16+HI
+  |    B_ld4s_x1 LFUNC:TMP1, LFUNC:TMP1
   |.endif
-  |     addi PC, RB, -16+HI
-  |     ld4s PC, PC
-  |   add TMP2, RA, RD
-  |    addlo TMP1, LFUNC:TMP1->pc
-  |    ld4u TMP1, TMP1
-  |  addi AT1, TMP2, -8+HI
+  |  B_X
+  |    B_add_x0 TMP2, RA, RD
+  |    B_ld4s_x1 PC, PC
+  |  addlo TMP1, LFUNC:TMP1->pc
+  |  B_X
+  |    B_addi_x0 AT1, TMP2, -8+HI
+  |    B_ld4u_x1 TMP1, TMP1
   |  st4 AT1, TISNIL
   |.if FFI
   |  bnez AT, >1
@@ -1314,26 +1323,37 @@ static void build_subroutines(BuildCtx *ctx)
   |.if FFI
   |1:
   |  // cont = 0: tailcall from C function.
-  |  addli TMP1, RB, -16
-  |  bnez TMP0, ->cont_ffi_callback	// cont = 1: return from FFI callback.
-  |  sub RC, TMP1, BASE
-  |  b ->vm_call_tail
+  |  B_X
+  |    B_addli_x0 TMP1, RB, -16
+  |    B_bnez_x1 TMP0, ->cont_ffi_callback	// cont = 1: return from FFI callback.
+  |  B_X
+  |    B_sub_x0 RC, TMP1, BASE
+  |    B_b_x1 ->vm_call_tail
   |.endif
   |
   |->cont_cat:				// RA = resultptr, RB = meta base
   |  addi INS, PC, -4
-  |  ld4u INS, INS
-  |   addli CARG2, RB, -16
-  |   ld AT, RA
-  |  decode_RB8a MULTRES, INS
-  |   decode_RA8a RA, INS
-  |  decode_RB8b MULTRES
-  |   decode_RA8b RA
-  |  add TMP1, BASE, MULTRES
-  |   addlo AT1, L:LREG->base
-  |   st AT1, BASE
-  |   sub CARG3, CARG2, TMP1
-  |  st CARG2, AT
+  |  B_X
+  |    B_addli_x0 CARG2, RB, -16
+  |    B_ld4u_x1 INS, INS
+  |  B_X
+  |    B_shrui_x0 MULTRES, INS, 21
+  |    B_ld_x1 AT, RA
+  |  B_X
+  |    B_bfextu_x0 MULTRES, MULTRES, 3, 10
+  |    B_shrui_x1 RA, INS, 5
+  |  B_X
+  |    B_bfextu_x0 RA, RA, 3, 10
+  |    B_shli_x1 MULTRES, MULTRES, 3
+  |  B_X
+  |    B_shli_x0 RA, RA, 3
+  |    B_add_x1 TMP1, BASE, MULTRES
+  |  B_X
+  |    B_addlo_x0 AT1, L:LREG->base
+  |    B_st_x1 CARG2, AT
+  |  B_X
+  |    B_sub_x0 CARG3, CARG2, TMP1
+  |    B_st_x1 AT1, BASE
   |  cmpne AT1, TMP1, CARG2
   |  bnez AT1, ->BC_CAT_Z
   |  add RA, BASE, RA
