@@ -1123,53 +1123,89 @@ static void build_subroutines(BuildCtx *ctx)
   |  // (lua_State *L, TValue *base, int nres1, ptrdiff_t ef)
   |  saveregs
   |  addli AT, sp, SAVE_ERRF
-  |  st AT, CARG4
-  |  addi PC, zero, FRAME_CP
+  |  B_X
+  |    B_addi_x0 PC, zero, FRAME_CP
+  |    B_st_x1 AT, CARG4
   |  b >1
   |
   |->vm_call:				// Setup C frame and enter VM.
   |  // (lua_State *L, TValue *base, int nres1)
-  |  saveregs
-  |  addi PC, zero, FRAME_C
+  |  // saveregs
+  |  addi sp, sp, -40 // 8 + 32
+  |  st_add sp, r30, -8
+  |  st_add sp, r31, -8
+  |  st_add sp, r32, -8
+  |  st_add sp, r33, -8
+  |  st_add sp, r34, -8
+  |  st_add sp, r35, -8
+  |  st_add sp, r36, -8
+  |  st_add sp, r37, -8
+  |  st_add sp, r38, -8
+  |  st_add sp, r39, -8
+  |  st_add sp, r40, -8
+  |  st_add sp, r41, -8
+  |  st_add sp, r42, -8
+  |  st_add sp, r43, -8
+  |  st_add sp, r44, -8
+  |  st_add sp, r45, -8
+  |  st_add sp, r52, -8
+  |  B_X
+  |    B_addi_x0 PC, zero, FRAME_C
+  |    B_st_add_x1 sp, lr, -TILE_ABI_RESERV
   |
   |1:  // Entry point for vm_pcall above (PC = ftype).
   |  addlo TMP1, L:CARG1->cframe
-  |  ld TMP1, TMP1
-  |   addli AT, sp, SAVE_NRES
-  |   st AT, CARG3
-  |    move L, CARG1
-  |   addli AT, sp, SAVE_L
-  |   st AT, CARG1
-  |    move BASE, CARG2
-  |  addlo AT, L:LREG->cframe			// Add our C frame to cframe chain.
-  |  st AT, sp
-  |    addlo DISPATCH, L:LREG->glref		// Setup pointer to dispatch table.
-  |    ld4u DISPATCH, DISPATCH
-  |   addi AT, sp, SAVE_PC
-  |   st AT, CARG1
-  |  addli AT, sp, SAVE_CFRAME
-  |  st AT, TMP1
-  |    addli DISPATCH, DISPATCH, GG_G2DISP
+  |  B_X
+  |    B_addli_x0 AT, sp, SAVE_NRES
+  |    B_ld_x1 TMP1, TMP1
+  |  B_X
+  |    B_move_x0 L, CARG1
+  |    B_st_x1 AT, CARG3
+  |  B_X
+  |    B_addli_x0 AT, sp, SAVE_L
+  |    B_move_x1 BASE, CARG2
+  |  B_X
+  |    B_addlo_x0 AT1, L:LREG->cframe			// Add our C frame to cframe chain.
+  |    B_st_x1 AT, CARG1
+  |  B_X
+  |    B_addlo_x0 DISPATCH, L:LREG->glref		// Setup pointer to dispatch table.
+  |    B_st_x1 AT1, sp
+  |  B_X
+  |    B_addi_x0 AT, sp, SAVE_PC
+  |    B_ld4u_x1 DISPATCH, DISPATCH
+  |  B_X
+  |    B_addli_x0 AT1, sp, SAVE_CFRAME
+  |    B_st_x1 AT, CARG1
+  |  B_X
+  |    B_addli_x0 DISPATCH, DISPATCH, GG_G2DISP
+  |    B_st_x1 AT1, TMP1
   |
   |3:  // Entry point for vm_cpcall/vm_resume (BASE = base, PC = ftype).
-  |  addlo AT, L:LREG->base		
-  |  ld TMP2, AT			// TMP2 = old base (used in vmeta_call).
-  |  addlo AT, L:LREG->top		
-  |   ld TMP1, AT
-  |  add PC, PC, BASE
-  |   sub NARGS8:RC, TMP1, BASE
-  |  sub PC, PC, TMP2			// PC = frame delta + frame type
-  |    li_vmstate INTERP
-  |     moveli TISNIL, LJ_TNIL
-  |    st_vmstate
+  |  addlo TMP2, L:LREG->base		
+  |  B_X
+  |    B_addlo_x0 TMP1, L:LREG->top		
+  |    B_ld_x1 TMP2, TMP2			// TMP2 = old base (used in vmeta_call).
+  |  B_X
+  |    B_add_x0 PC, PC, BASE
+  |    B_ld_x1 TMP1, TMP1
+  |  B_X
+  |    B_sub_x0 NARGS8:RC, TMP1, BASE
+  |    B_sub_x1 PC, PC, TMP2			// PC = frame delta + frame type
+  |  B_X
+  |    //li_vmstate INTERP
+  |    B_moveli_x0 TMP0, ~LJ_VMST_INTERP
+  |    B_moveli_x1 TISNIL, -1//LJ_TNIL
+  |  st_vmstate
   |
   |->vm_call_dispatch:
   |  // TMP2 = old base, BASE = new base, RC = nargs*8, PC = caller PC
   |  addi TMP0, BASE, FRAME_PC
-  |  ld4s TMP0, TMP0
-  |  moveli AT, LJ_TFUNC
-  |  cmpne AT1, TMP0, AT
-  |  addi LFUNC:RB, BASE, FRAME_FUNC
+  |  B_X
+  |    B_moveli_x0 AT, LJ_TFUNC
+  |    B_ld4s_x1 TMP0, TMP0
+  |  B_X
+  |    B_cmpne_x0 AT1, TMP0, AT
+  |    B_addi_x1 LFUNC:RB, BASE, FRAME_FUNC
   |  ld4s LFUNC:RB, LFUNC:RB
   |  bnez AT1, ->vmeta_call
   |
@@ -1179,33 +1215,63 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vm_cpcall:				// Setup protected C frame, call C.
   |  // (lua_State *L, lua_CFunction func, void *ud, lua_CPFunction cp)
-  |  saveregs
-  |  move L, CARG1
-  |   addlo TMP0, L:CARG1->stack
-  |   ld4u TMP0, TMP0
-  |  addli AT, sp, SAVE_L
-  |  st AT, CARG1
-  |   addlo TMP1, L:CARG1->top
-  |   ld TMP1, TMP1
-  |  addi AT, sp, SAVE_PC
-  |  st AT, CARG1			// Any value outside of bytecode is ok.
-  |   sub TMP0, TMP0, TMP1		// Compute -savestack(L, L->top).
-  |   addlo AT, L:CARG1->cframe
-  |    ld TMP1, AT
-  |    st AT, sp			// Add our C frame to cframe chain.
-  |   addli AT, sp, SAVE_NRES		// Neg. delta means cframe w/o frame.
-  |    st AT, TMP0
-  |  addli AT, sp, SAVE_ERRF		// No error function.
-  |   st AT, r0
-  |  addli AT, sp, SAVE_CFRAME
-  |  st AT, TMP1
+  |  // saveregs
+  |  addi sp, sp, -40 // 8 + 32
+  |  st_add sp, r30, -8
+  |  st_add sp, r31, -8
+  |  st_add sp, r32, -8
+  |  st_add sp, r33, -8
+  |  st_add sp, r34, -8
+  |  st_add sp, r35, -8
+  |  st_add sp, r36, -8
+  |  st_add sp, r37, -8
+  |  st_add sp, r38, -8
+  |  st_add sp, r39, -8
+  |  st_add sp, r40, -8
+  |  st_add sp, r41, -8
+  |  st_add sp, r42, -8
+  |  st_add sp, r43, -8
+  |  st_add sp, r44, -8
+  |  st_add sp, r45, -8
+  |  st_add sp, r52, -8
+  |  B_X
+  |    B_move_x0 L, CARG1
+  |    B_st_add_x1 sp, lr, -TILE_ABI_RESERV
+  |  addlo TMP0, L:CARG1->stack
+  |  B_X
+  |    B_addli_x0 AT, sp, SAVE_L
+  |    B_ld4u_x1 TMP0, TMP0
+  |  B_X
+  |    B_addlo_x0 TMP1, L:CARG1->top
+  |    B_st_x1 AT, CARG1
+  |  B_X
+  |    B_addi_x0 AT, sp, SAVE_PC
+  |    B_ld_x1 TMP1, TMP1
+  |  B_X
+  |    B_sub_x0 TMP0, TMP0, TMP1		// Compute -savestack(L, L->top).
+  |    B_st_x1 AT, CARG1			// Any value outside of bytecode is ok.
+  |  addlo AT, L:CARG1->cframe
+  |  ld TMP1, AT
+  |  B_X
+  |    B_addli_x0 AT1, sp, SAVE_NRES		// Neg. delta means cframe w/o frame.
+  |    B_st_x1 AT, sp			// Add our C frame to cframe chain.
+  |  B_X
+  |    B_addli_x0 AT, sp, SAVE_ERRF		// No error function.
+  |    B_st_x1 AT1, TMP0
+  |  B_X
+  |    B_addli_x0 AT1, sp, SAVE_CFRAME
+  |    B_st_x1 AT, r0
+  |  st AT1, TMP1
   |  jalr CARG4			// (lua_State *L, lua_CFunction func, void *ud)
-  |  move BASE, CRET1
-  |   addlo DISPATCH, L:LREG->glref	// Setup pointer to dispatch table.
-  |   ld4u DISPATCH, DISPATCH
-  |    addi PC, zero, FRAME_CP
-  |  addli DISPATCH, DISPATCH, GG_G2DISP
-  |  bnez CRET1, <3			// Else continue with the call.
+  |  B_X
+  |    B_move_x0 BASE, CRET1
+  |    B_addlo_x1 DISPATCH, L:LREG->glref	// Setup pointer to dispatch table.
+  |  B_X
+  |    B_addi_x0 PC, zero, FRAME_CP
+  |    B_ld4u_x1 DISPATCH, DISPATCH
+  |  B_X
+  |    B_addli_x0 DISPATCH, DISPATCH, GG_G2DISP
+  |    B_bnez_x1 CRET1, <3			// Else continue with the call.
   |  b ->vm_leave_cp			// No base? Just remove C frame.
   |
   |//-----------------------------------------------------------------------
