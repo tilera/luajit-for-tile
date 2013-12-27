@@ -94,23 +94,41 @@ local function writeactions(out, name)
 
   local i = 1
   while i <= nn - 1 do
-    if (tobit(actlist[i]) == -1) then
+    if tobit(actlist[i]) == -1 then
       assert(out:write("0b00"))
-      nnn = i + 2 -- X1
-      if (tobit(actlist[nnn]) >= 0) then
-        assert(out:write(tobinary(actlist[nnn], 31)))
-        nnn = i + 1 -- X0
-        assert(out:write(tobinary(actlist[nnn], 31), "L,\n"))
+      if (tobit(actlist[i + 2]) >= 0) then
+	local x1 = tobinary(actlist[i + 2], 31)
+	local x0 = tobinary(actlist[i + 1], 31)
+        assert(out:write(x1, x0, "L,\n"))
         i = i + 3
       else -- X0 has an accompany relocation which occupies X1 slot.
-        nnn = i + 3 -- X1
-        assert(out:write(tobinary(actlist[nnn], 31)))
-        nnn = i + 1 -- X0
-        assert(out:write(tobinary(actlist[nnn], 31), "L,\n"))
-        nnn = i + 2 -- X0 relocation
-        assert(out:write("0b11111111111111111111111111111111", tobinary(actlist[nnn], 32), "L,\n"))
+	local x1 = tobinary(actlist[i + 3], 31)
+	local x0 = tobinary(actlist[i + 1], 31)
+	local x0_r = tobinary(actlist[i + 2], 32)
+        assert(out:write(x1, x0, "L,\n"))
+        assert(out:write("0b11111111111111111111111111111111", x0_r, "L,\n"))
         i = i + 4
       end
+    elseif tobit(actlist[i]) == -2 or tobit(actlist[i]) == -3 or tobit(actlist[i]) == -4 then
+      if tobit(actlist[i]) == -2 then
+        assert(out:write("0b01"))
+      elseif tobit(actlist[i]) == -3 then
+        assert(out:write("0b10"))
+      elseif tobit(actlist[i]) == -4 then
+        assert(out:write("0b11"))
+      end
+
+      if (tobit(actlist[i + 2]) >= 0) then
+	local y2 = tobinary(actlist[i+3], 14)
+	local y1 = tobinary(actlist[i+2], 24)
+	local y0 = tobinary(actlist[i+1], 24)
+        assert(out:write(sub(y1, 1, 4), sub(y2, 1, 7), sub(y1, 5, 24),
+	       sub(y0, 1, 4), sub(y2, 8, 14), sub(y0, 5, 24), "L,\n"))
+        i = i + 4
+      else -- Y0 has an accompany relocation which occupies Y1 slot.
+        assert(0, "relocation in Y bundle TBD")
+      end
+
     else
       assert(out:write("0b11111111111111111111111111111111", tobinary(actlist[i], 32), "L,\n"))
       i = i + 1
@@ -299,17 +317,23 @@ end
 local map_op = {
   -- Bundle Markers.
   B_X_0 =	"FFFFFFFF0",
-  B_Y0_0 =	"FFFFFFFE3",
-  B_Y1_0 =	"FFFFFFFD3",
-  B_Y2_0 =	"FFFFFFFC3",
+  B_Y1_0 =	"FFFFFFFE3",
+  B_Y2_0 =	"FFFFFFFD3",
+  B_Y3_0 =	"FFFFFFFC3",
 
   -- Arithmetic Instructions.
   B_move_x0_2 =		"5107F0001DA",
   B_move_x1_2 =		"5077F0002DA",
+  B_move_y0_2 =		"00ABF0004DA",
+  B_move_y1_2 =		"00BBF0004DA",
   B_add_x0_3 =		"500C00001DAB",
   B_add_x1_3 =		"500C00002DAB",
   B_addi_x0_3 =		"401000001DAe",
   B_addi_x1_3 =		"301000002DAE",
+  -- Y0/Y1 IMM8 relocation offset are the same with X0/X1,
+  -- so we reuse e/E flag for Y bundle.
+  B_addi_y0_3 =		"000000004DAe",
+  B_addi_y1_3 =		"001000004DAE",
   B_addli_x0_3 =	"100000001DAi",
   B_addli_x1_3 =	"000000002DAI",
   B_moveli_x0_2 =	"10000FC01Di",
@@ -363,8 +387,11 @@ local map_op = {
   B_st1_x1_2 =		"50A800002AB",
   B_st_add_x1_3 =	"320000002ABz",
   B_ld_x1_2 =		"50D5D0002DA",
+  B_ld_y2_2 =		"000020402LD",
   B_ld4u_x1_2 =		"50D540002DA",
+  B_ld4u_y2_2 =		"000020005LD",
   B_ld4s_x1_2 =		"50D530002DA",
+  B_ld4s_y2_2 =		"000000405LD",
   B_ld2u_x1_2 =		"50D520002DA",
   B_ld2s_x1_2 =		"50D510002DA",
   B_ld1u_x1_2 =		"50D500002DA",
@@ -545,6 +572,8 @@ map_op[".template__"] = function(params, template, nparams)
       op = op + shl(parse_gpr(params[n]), 12); n = n + 1
     elseif p == "D" then
       op = op + parse_gpr(params[n]); n = n + 1
+    elseif p == "L" then
+      op = op + shl(parse_gpr(params[n]), 7); n = n + 1
     elseif p == "O" then
       op = op + parse_rbo_x1_imm16(params[n], 1); n = n + 1
     elseif p == "o" then

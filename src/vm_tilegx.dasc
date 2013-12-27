@@ -811,12 +811,14 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |  // Return from pcall or xpcall fast func.
   |  addi PC, TMP2, FRAME_PC
-  |  ld4s PC, PC
-  |  move BASE, TMP2			// Restore caller base.
-  |  // Prepending may overwrite the pcall frame, so do it at the end.
-  |   addi AT, RA, FRAME_PC
-  |   st4 AT, TMP1
-  |   addli RA, RA, -8
+  |  B_Y2
+  |    B_move_y0 BASE, TMP2			// Restore caller base.
+  |    // Prepending may overwrite the pcall frame, so do it at the end.
+  |    B_addi_y1 AT, RA, FRAME_PC
+  |    B_ld4s_y2 PC, PC
+  |  B_X
+  |    B_addli_x0 RA, RA, -8
+  |    B_st4_x1 AT, TMP1
   |
   |->vm_returnc:
   |   addli RD, RD, 8			// RD = (nresults+1)*8.
