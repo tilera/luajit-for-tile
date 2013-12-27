@@ -384,12 +384,13 @@ local map_op = {
 
   -- Memory Instructions.
   B_st_x1_2 =		"50C400002AB",
+  B_st_y2_2 =		"000020405DL",
   B_st4_x1_2 =		"50B000002AB",
   B_st2_x1_2 =		"50AC00002AB",
   B_st1_x1_2 =		"50A800002AB",
   B_st_add_x1_3 =	"320000002ABz",
   B_ld_x1_2 =		"50D5D0002DA",
-  B_ld_y2_2 =		"000020402LD",
+  B_ld_y2_2 =		"000020405LD",
   B_ld4u_x1_2 =		"50D540002DA",
   B_ld4u_y2_2 =		"000020005LD",
   B_ld4s_x1_2 =		"50D530002DA",

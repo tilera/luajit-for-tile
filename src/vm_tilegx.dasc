@@ -1035,50 +1035,87 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vm_resume:				// Setup C frame and resume thread.
   |  // (lua_State *L, TValue *base, int nres1 = 0, ptrdiff_t ef = 0)
-  |  saveregs
-  |  move L, CARG1
-  |    addlo DISPATCH, L:LREG->glref		// Setup pointer to dispatch table.
-  |    ld4u DISPATCH, DISPATCH
-  |  move BASE, CARG2
-  |    addlo TMP1, L:LREG->status
-  |    ld1u TMP1, TMP1
-  |   addli AT, sp, SAVE_L
-  |   st AT, L
-  |  addi PC, zero, FRAME_CP
-  |  addli TMP0, sp, CFRAME_RESUME
-  |    addli DISPATCH, DISPATCH, GG_G2DISP
-  |   addli AT, sp, SAVE_NRES
-  |   st AT, zero
-  |   addli AT, sp, SAVE_ERRF
-  |   st AT, zero
-  |  addlo AT, L:LREG->cframe
-  |  st AT, TMP0
-  |   addli AT, sp, SAVE_CFRAME
-  |   st AT, zero
-  |   addi AT, sp, SAVE_PC
+  |  //saveregs
+  |  addi sp, sp, -40 // 8 + 32
+  |  st_add sp, r30, -8
+  |  st_add sp, r31, -8
+  |  st_add sp, r32, -8
+  |  st_add sp, r33, -8
+  |  st_add sp, r34, -8
+  |  st_add sp, r35, -8
+  |  st_add sp, r36, -8
+  |  st_add sp, r37, -8
+  |  st_add sp, r38, -8
+  |  st_add sp, r39, -8
+  |  st_add sp, r40, -8
+  |  st_add sp, r41, -8
+  |  st_add sp, r42, -8
+  |  st_add sp, r43, -8
+  |  st_add sp, r44, -8
+  |  st_add sp, r45, -8
+  |  st_add sp, r52, -8
+  |  B_X
+  |    B_move_x0 L, CARG1
+  |    B_st_add_x1 sp, lr, -TILE_ABI_RESERV
+  |  B_X
+  |    B_addlo_x0 DISPATCH, L:LREG->glref	// Setup pointer to dispatch table.
+  |    B_move_x1 BASE, CARG2
+  |  B_X
+  |    B_addlo_x0 TMP1, L:LREG->status
+  |    B_ld4u_x1 DISPATCH, DISPATCH
+  |  B_X
+  |    B_addli_x0 AT, sp, SAVE_L
+  |    B_ld1u_x1 TMP1, TMP1
+  |  B_Y3
+  |    B_addi_y0 PC, zero, 5 // FRAME_CP
+  |    B_addi_y1 TMP0, sp, 1 //CFRAME_RESUME
+  |    B_st_y2 AT, L
+  |  B_X
+  |    B_addli_x0 DISPATCH, DISPATCH, GG_G2DISP
+  |    B_addli_x1 AT, sp, SAVE_NRES
+  |  B_X
+  |    B_addli_x0 AT1, sp, SAVE_ERRF
+  |    B_st_x1 AT, zero
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->cframe
+  |    B_st_x1 AT1, zero
+  |  B_X
+  |    B_addli_x0 AT1, sp, SAVE_CFRAME
+  |    B_st_x1 AT, TMP0
+  |  B_X
+  |    B_addi_x0 AT, sp, SAVE_PC
+  |    B_st_x1 AT1, zero
   |  st AT, CARG1
-  |    beqz TMP1, >3
+  |  beqz TMP1, >3
   |
   |  // Resume after yield (like a return).
-  |  move RA, BASE
-  |   addlo BASE, L:LREG->base
-  |   ld BASE, BASE
-  |   addlo TMP1, L:LREG->top
-  |   ld TMP1, TMP1
-  |  addi PC, BASE, FRAME_PC
-  |  ld4s PC, PC
-  |     //lui TMP3, 0x59c0		// TOBIT = 2^52 + 2^51 (float).
-  |   sub RD, TMP1, BASE
-  |     //mtc1 TMP3, TOBIT
-  |    addlo AT, L:LREG->status
-  |    st1 AT, r0
-  |     //cvt.d.s TOBIT, TOBIT
-  |    li_vmstate INTERP
-  |   addli RD, RD, 8
-  |    st_vmstate
-  |   move MULTRES, RD
-  |  andi TMP0, PC, FRAME_TYPE
-  |    addi TISNIL, zero, LJ_TNIL
+  |  B_X
+  |    B_move_x0 RA, BASE
+  |    B_addlo_x1 BASE, L:LREG->base
+  |  B_X
+  |    B_addlo_x0 TMP1, L:LREG->top
+  |    B_ld_x1 BASE, BASE
+  |  B_X
+  |    B_addi_x0 PC, BASE, FRAME_PC
+  |    B_ld_x1 TMP1, TMP1
+  |  B_X
+  |    B_sub_x0 RD, TMP1, BASE
+  |    B_ld4s_x1 PC, PC
+  |  addlo AT, L:LREG->status
+  |  B_X
+  |    //li_vmstate INTERP
+  |    B_moveli_x0 TMP0, ~LJ_VMST_INTERP
+  |    B_st1_x1 AT, zero
+  |  B_X
+  |    B_addli_x0 RD, RD, 8
+  |    //st_vmstate
+  |    B_addli_x1 AT, DISPATCH, DISPATCH_GL(vmstate)
+  |  B_X
+  |    B_move_x0 MULTRES, RD
+  |    B_st4_x1 AT, TMP0
+  |  B_X
+  |    B_andi_x0 TMP0, PC, FRAME_TYPE
+  |    B_addi_x1 TISNIL, zero, LJ_TNIL
   |  beqz TMP0, ->BC_RET_Z
   |  b ->vm_return
   |
