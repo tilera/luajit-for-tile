@@ -1363,57 +1363,70 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Table indexing metamethods -----------------------------------------
   |
   |->vmeta_tgets1:
-  |  addli CARG3, DISPATCH, DISPATCH_GL(tmptv)
-  |  addi TMP0, zero, LJ_TSTR
-  |  addi AT, CARG3, LO
-  |  st4 AT, STR:RC
-  |  addi AT, CARG3, HI
+  |  B_X
+  |    B_addli_x0 CARG3, DISPATCH, DISPATCH_GL(tmptv)
+  |    B_addi_x1 TMP0, zero, -5 //LJ_TSTR
+  |  B_X
+  |    B_addi_x0 AT, CARG3, HI
+  |    B_st4_x1 CARG3, STR:RC
   |  st4 AT, TMP0
   |  b >1
   |
   |->vmeta_tgets:
-  |  addli CARG2, DISPATCH, DISPATCH_GL(tmptv)
-  |  addi TMP0, zero, LJ_TTAB
-  |  addi AT, CARG2, LO
-  |  st4 AT, TAB:RB
-  |   addli CARG3, DISPATCH, DISPATCH_GL(tmptv2)
-  |  addi AT, CARG2, HI
-  |  st4 AT, TMP0
-  |   addi TMP1, zero, LJ_TSTR
-  |  addi AT, CARG3, LO
-  |   st4 AT, STR:RC
-  |  addi AT, CARG3, HI
-  |  st4 AT, TMP1
+  |  B_X
+  |    B_addli_x0 CARG2, DISPATCH, DISPATCH_GL(tmptv)
+  |    B_addi_x1 TMP0, zero, -12 //LJ_TTAB
+  |  B_X
+  |    B_addli_x0 CARG3, DISPATCH, DISPATCH_GL(tmptv2)
+  |    B_st4_x1 CARG2, TAB:RB
+  |  B_X
+  |    B_addi_x0 AT, CARG2, HI
+  |    B_st4_x1 CARG3, STR:RC
+  |  B_Y3
+  |    B_addi_y0 TMP1, zero, -5 //LJ_TSTR
+  |    B_addi_y1 AT1, CARG3, HI
+  |    B_st4_y2 AT, TMP0
+  |  st4 AT1, TMP1
   |  b >1
   |
   |->vmeta_tgetb:			// TMP0 = index
-  |   cmpltsi AT, TMP0, 0
-  |   sub AT1, zero, TMP0
-  |   moveli AT2, 539
-  |   cmovnez TMP0, AT, AT1
-  |   shli AT2, AT2, 8
-  |   shli AT1, TMP0, 4
-  |   bfins AT2, AT, 20, 20
-  |   fdouble_pack1 TMP0, AT1, AT2
-  |   fdouble_pack2 TMP0, AT1, zero
-  |  addli CARG3, DISPATCH, DISPATCH_GL(tmptv)
+  |  B_X
+  |    B_cmpltsi_x0 AT, TMP0, 0
+  |    B_sub_x1 AT1, zero, TMP0
+  |  B_X
+  |    B_cmovnez_x0 TMP0, AT, AT1
+  |    B_moveli_x1 AT2, 539
+  |  B_X
+  |    B_shli_x0 AT2, AT2, 8
+  |    B_shli_x1 AT1, TMP0, 4
+  |  bfins AT2, AT, 20, 20
+  |  fdouble_pack1 TMP0, AT1, AT2
+  |  B_X
+  |    B_fdouble_pack2_x0 TMP0, AT1, zero
+  |    B_addli_x1 CARG3, DISPATCH, DISPATCH_GL(tmptv)
   |  st CARG3, TMP0
   |
   |->vmeta_tgetv:
   |1:
-  |  load_got lj_meta_tget
-  |  addlo AT, L:LREG->base
-  |  st AT, BASE
-  |  addi AT, sp, SAVE_PC
-  |  st AT, PC
-  |  move CARG1, L
+  |  // load_got lj_meta_tget
+  |  addli CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_tget)
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addi_x0 AT1, sp, SAVE_PC
+  |    B_st_x1 AT, BASE
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    B_st_x1 AT1, PC
   |  call_intern lj_meta_tget		// (lua_State *L, TValue *o, TValue *k)
   |  // Returns TValue * (finished) or NULL (metamethod).
-  |  addli TMP1, BASE, -FRAME_CONT
-  |  beqz CRET1, >3
+  |  B_X
+  |    B_addli_x0 TMP1, BASE, -FRAME_CONT
+  |    B_beqz_x1 CRET1, >3
   |  ld AT, CRET1
   |  ins_next1
-  |   st RA, AT
+  |  st RA, AT
   |  ins_next2
   |
   |3:  // Call __index metamethod.
@@ -1421,68 +1434,81 @@ static void build_subroutines(BuildCtx *ctx)
   |  addlo BASE, L:LREG->top
   |  ld BASE, BASE
   |  addi AT, BASE, -16 + HI
-  |  st4 AT, PC
-  |   sub PC, BASE, TMP1
+  |  B_X
+  |    B_sub_x0 PC, BASE, TMP1
+  |    B_st4_x1 AT, PC
   |  addi LFUNC:RB, BASE, FRAME_FUNC
-  |  ld4s LFUNC:RB, LFUNC:RB
-  |  addi NARGS8:RC, zero, 16			// 2 args for func(t, k).
+  |  B_X
+  |    B_addi_x0 NARGS8:RC, zero, 16			// 2 args for func(t, k).
+  |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
   |  b ->vm_call_dispatch_f
   |
   |//-----------------------------------------------------------------------
   |
   |->vmeta_tsets1:
-  |  addli CARG3, DISPATCH, DISPATCH_GL(tmptv)
-  |  addi TMP0, zero, LJ_TSTR
-  |  addi AT, CARG3, LO
-  |  st4 AT, STR:RC
-  |  addi AT, CARG3, HI
+  |  B_X
+  |    B_addli_x0 CARG3, DISPATCH, DISPATCH_GL(tmptv)
+  |    B_addi_x1 TMP0, zero, -5 // LJ_TSTR
+  |  B_X
+  |    B_addi_x0 AT, CARG3, HI
+  |    B_st4_x1 CARG3, STR:RC
   |  st4 AT, TMP0
   |  b >1
   |
   |->vmeta_tsets:
-  |  addli CARG2, DISPATCH, DISPATCH_GL(tmptv)
-  |  addi TMP0, zero, LJ_TTAB
-  |  addi AT, CARG2, LO
-  |  st4 AT, TAB:RB
-  |   addli CARG3, DISPATCH, DISPATCH_GL(tmptv2)
-  |  addi AT, CARG2, HI
-  |  st4 AT, TMP0
-  |   addi TMP1, zero, LJ_TSTR
-  |  addi AT, CARG3, LO
-  |   st4 AT, STR:RC
+  |  B_X
+  |    B_addli_x0 CARG2, DISPATCH, DISPATCH_GL(tmptv)
+  |    B_addi_x1 TMP0, zero, -12 // LJ_TTAB
+  |  B_X
+  |    B_addli_x0 CARG3, DISPATCH, DISPATCH_GL(tmptv2)
+  |    B_st4_x1 CARG2, TAB:RB
+  |  B_X
+  |    B_addi_x0 AT, CARG2, HI
+  |    B_st4_x1 CARG3, STR:RC
+  |  B_X
+  |    B_addi_x0 TMP1, zero, LJ_TSTR
+  |    B_st4_x1 AT, TMP0
   |  addi AT, CARG3, HI
   |  st4 AT, TMP1
   |  b >1
   |
   |->vmeta_tsetb:			// TMP0 = index
-  |  //cvt.d.w f0, f0
-  |   cmpltsi AT, TMP0, 0
-  |   sub AT1, zero, TMP0
-  |   moveli AT2, 539
-  |   cmovnez TMP0, AT, AT1
-  |   shli AT2, AT2, 8
-  |   shli AT1, TMP0, 4
-  |   bfins AT2, AT, 20, 20
-  |   fdouble_pack1 TMP0, AT1, AT2
-  |   fdouble_pack2 TMP0, AT1, zero
-  |  addli CARG3, DISPATCH, DISPATCH_GL(tmptv)
+  |  B_X
+  |    B_cmpltsi_x0 AT, TMP0, 0
+  |    B_sub_x1 AT1, zero, TMP0
+  |  B_X
+  |    B_cmovnez_x0 TMP0, AT, AT1
+  |    B_moveli_x1 AT2, 539
+  |  B_X
+  |    B_shli_x0 AT2, AT2, 8
+  |    B_shli_x1 AT1, TMP0, 4
+  |  bfins AT2, AT, 20, 20
+  |  fdouble_pack1 TMP0, AT1, AT2
+  |  B_X
+  |    B_fdouble_pack2_x0 TMP0, AT1, zero
+  |    B_addli_x1 CARG3, DISPATCH, DISPATCH_GL(tmptv)
   |  st CARG3, TMP0
   |
   |->vmeta_tsetv:
   |1:
-  |  load_got lj_meta_tset
-  |  addlo AT, L:LREG->base
-  |  st AT, BASE
-  |  addi AT, sp, SAVE_PC
-  |  st AT, PC
-  |  move CARG1, L
+  |  //load_got lj_meta_tset
+  |  addli CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_tset)
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addi_x0 AT1, sp, SAVE_PC
+  |    B_st_x1 AT, BASE
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    B_st_x1 AT1, PC
   |  call_intern lj_meta_tset		// (lua_State *L, TValue *o, TValue *k)
   |  // Returns TValue * (finished) or NULL (metamethod).
   |  ld AT2, RA
   |  beqz CRET1, >3
   |  // NOBARRIER: lj_meta_tset ensures the table is not black.
   |  ins_next1
-  |   st CRET1, AT2
+  |  st CRET1, AT2
   |  ins_next2
   |
   |3:  // Call __newindex metamethod.
@@ -1491,13 +1517,16 @@ static void build_subroutines(BuildCtx *ctx)
   |  addlo BASE, L:LREG->top
   |  ld BASE, BASE
   |  addi AT, BASE, -16+HI
-  |  st4 AT, PC
-  |   sub PC, BASE, TMP1
+  |  B_X
+  |    B_sub_x0 PC, BASE, TMP1
+  |    B_st4_x1 AT, PC
   |  addi LFUNC:RB, BASE, FRAME_FUNC
-  |  ld4s LFUNC:RB, LFUNC:RB
-  |  addi AT, BASE, 16
-  |  st AT, AT2
-  |  addi NARGS8:RC, zero, 24			// 3 args for func(t, k, v)
+  |  B_X
+  |    B_addi_x0 AT, BASE, 16
+  |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
+  |  B_X
+  |    B_addi_x0 NARGS8:RC, zero, 24			// 3 args for func(t, k, v)
+  |    B_st_x1 AT, AT2
   |  b ->vm_call_dispatch_f
   |
   |//-- Comparison metamethods ---------------------------------------------
