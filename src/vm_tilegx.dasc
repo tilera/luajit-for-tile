@@ -625,16 +625,9 @@
 |.macro ins_NEXT2
 |  decode_OP4a TMP1, INS
 |  decode_OP4b TMP1
-|  //add TMP0, DISPATCH, TMP1
-|  //decode_RD8a RD, INS
 |  B_X
 |    B_add_x0 TMP0, DISPATCH, TMP1
 |    B_shrui_x1 RD, INS, 16
-|  //ld AT, TMP0
-|  //decode_RA8a RA, INS
-|  //decode_RD8b RD
-|  //decode_RA8b RA
-|  //jr AT
 |  B_X
 |    B_shrui_x0, RA, INS, 5
 |    B_ld_x1, AT, TMP0
@@ -821,51 +814,67 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_st4_x1 AT, TMP1
   |
   |->vm_returnc:
-  |   addli RD, RD, 8			// RD = (nresults+1)*8.
-  |  andi TMP0, PC, FRAME_TYPE
-  |   addi CRET1, zero, LUA_YIELD
-  |   beqz RD, ->vm_unwind_c_eh
-  |  move MULTRES, RD
-  |  beqz TMP0, ->BC_RET_Z		// Handle regular return to Lua.
+  |  B_X
+  |    B_addli_x0 RD, RD, 8			// RD = (nresults+1)*8.
+  |    B_andi_x1 TMP0, PC, FRAME_TYPE
+  |  B_X
+  |    B_addi_x0 CRET1, zero, 1 //LUA_YIELD
+  |    B_beqz_x1 RD, ->vm_unwind_c_eh
+  |  B_X
+  |    B_move_x0 MULTRES, RD
+  |    B_beqz_x1 TMP0, ->BC_RET_Z		// Handle regular return to Lua.
   |
   |->vm_return:
   |  // BASE = base, RA = resultptr, RD/MULTRES = (nresults+1)*8, PC = return
   |  // TMP0 = PC & FRAME_TYPE
-  |   addi TMP2, zero, -8
-  |  xori AT, TMP0, FRAME_C
-  |   and TMP2, PC, TMP2
-  |  sub TMP2, BASE, TMP2		// TMP2 = previous base.
-  |  bnez AT, ->vm_returnp
+  |  B_X
+  |    B_addi_x0 TMP2, zero, -8
+  |    B_xori_x1 AT, TMP0, FRAME_C
+  |  and TMP2, PC, TMP2
+  |  B_X
+  |    B_sub_x0 TMP2, BASE, TMP2		// TMP2 = previous base.
+  |    B_bnez_x1 AT, ->vm_returnp
   |
-  |  addli TMP1, RD, -8
-  |   addlo AT, L:LREG->base
-  |   st AT, TMP2
-  |    li_vmstate C
-  |   addli TMP2, sp, SAVE_NRES
-  |   ld TMP2, TMP2
-  |   addli BASE, BASE, -8
-  |    st_vmstate
-  |   shli TMP2, TMP2, 3
-  |  beqz TMP1, >2
+  |  B_X
+  |    B_addli_x0 TMP1, RD, -8
+  |    B_addlo_x1 AT, L:LREG->base
+  |  B_X
+  |    //li_vmstate C
+  |    B_moveli_x0 TMP0, ~LJ_VMST_C
+  |    B_st_x1 AT, TMP2
+  |  addli TMP2, sp, SAVE_NRES
+  |  B_X
+  |    B_addli_x0 BASE, BASE, -8
+  |    B_ld_x1 TMP2, TMP2
+  |  st_vmstate
+  |  B_X
+  |    B_shli_x0 TMP2, TMP2, 3
+  |    B_beqz_x1 TMP1, >2
   |1:
-  |  addli TMP1, TMP1, -8
-  |   ld AT, RA
-  |    addli RA, RA, 8
-  |   st BASE, AT
-  |  addli BASE, BASE, 8
-  |  bnez TMP1, <1
+  |  B_X
+  |    B_addli_x0 TMP1, TMP1, -8
+  |    B_ld_x1 AT, RA
+  |  B_X
+  |    B_addli_x0 RA, RA, 8
+  |    B_st_x1 BASE, AT
+  |  B_X
+  |    B_addli_x0 BASE, BASE, 8
+  |    B_bnez_x1 TMP1, <1
   |
   |2:
-  |  cmpne AT, TMP2, RD
-  |  addlo AT1, L:LREG->top
+  |  B_X
+  |    B_cmpne_x0 AT, TMP2, RD
+  |    B_addlo_x1 AT1, L:LREG->top
   |  st AT1, BASE
   |  bnez AT, >6
   |
   |->vm_leave_cp:
-  |  addli TMP0, sp, SAVE_CFRAME
-  |  ld TMP0, TMP0		// Restore previous C frame.
-  |   move CRET1, zero		// Ok return status for vm_pcall.
-  |  addlo AT, L:LREG->cframe
+  |  B_X
+  |    B_addli_x0 TMP0, sp, SAVE_CFRAME
+  |    B_addlo_x1 AT, L:LREG->cframe
+  |  B_X
+  |    B_move_x0 CRET1, zero		// Ok return status for vm_pcall.
+  |    B_ld_x1 TMP0, TMP0		// Restore previous C frame.
   |  st AT, TMP0
   |
   |->vm_leave_unw:
@@ -873,22 +882,25 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |6:
   |  addlo TMP1, L:LREG->maxstack
-  |  ld4u TMP1, TMP1
-  |  cmplts AT, TMP2, RD
+  |  B_X
+  |    B_cmplts_x0 AT, TMP2, RD
+  |    B_ld4u_x1 TMP1, TMP1
   |  // More results wanted. Check stack size and fill up results with nil.
-  |  cmplts AT1, BASE, TMP1
-  |  bnez AT, >7			// Less results wanted?
+  |  B_X
+  |    B_cmplts_x0 AT1, BASE, TMP1
+  |    B_bnez_x1 AT, >7			// Less results wanted?
   |  beqz AT1, >8
-  |  st BASE, TISNIL
-  |  addi RD, RD, 8
-  |  addi BASE, BASE, 8
+  |  B_X
+  |    B_addi_x0 RD, RD, 8
+  |    B_st_add_x1 BASE, TISNIL, 8
   |  b <2
   |
   |7:  // Less results wanted.
-  |  sub TMP0, RD, TMP2
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->top
+  |    B_sub_x1 TMP0, RD, TMP2
   |  sub TMP0, BASE, TMP0		// Either keep top or shrink it.
   |  cmovnez BASE, TMP2, TMP0		// LUA_MULTRET+1 case?
-  |  addlo AT, L:LREG->top
   |  st AT, BASE
   |  b ->vm_leave_cp
   |
@@ -897,17 +909,26 @@ static void build_subroutines(BuildCtx *ctx)
   |  // - A C function grows the stack (a lot).
   |  // - The GC shrinks the stack in between.
   |  // - A return back from a lua_call() with (high) nresults adjustment.
-  |  load_got lj_state_growstack
-  |   move MULTRES, RD
-  |  move CARG2, TMP2
-  |  move CARG1, L
-  |  call_intern lj_state_growstack	// (lua_State *L, int n)
-  |    addli TMP2, sp, SAVE_NRES
-  |    ld TMP2, TMP2
-  |  addlo BASE, L:LREG->top			// Need the (realloced) L->top in BASE.
-  |  ld BASE, BASE
-  |   move RD, MULTRES
-  |  shli TMP2, TMP2, 3
+  |
+  |  //load_got lj_state_growstack
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_state_growstack)
+  |    B_move_x1 MULTRES, RD
+  |  B_X
+  |    B_move_x0 CARG2, TMP2
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    //call_intern lj_state_growstack	// (lua_State *L, int n)
+  |    B_jalr_x1 CFUNCADDR
+  |  addli TMP2, sp, SAVE_NRES
+  |  B_X
+  |    B_addlo_x0 BASE, L:LREG->top			// Need the (realloced) L->top in BASE.
+  |    B_ld_x1 TMP2, TMP2
+  |  B_Y2
+  |    B_move_y0 RD, MULTRES
+  |    B_shli_y1 TMP2, TMP2, 3
+  |    B_ld_y2 BASE, BASE
   |  b <2
   |
   |->vm_unwind_c:			// Unwind C stack, return from vm_pcall.
