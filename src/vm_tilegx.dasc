@@ -987,33 +987,45 @@ static void build_subroutines(BuildCtx *ctx)
   |//-----------------------------------------------------------------------
   |
   |->vm_growstack_c:			// Grow stack for C function.
-  |  addi CARG2, zero, LUA_MINSTACK
-  |  b >2
+  |  B_X
+  |    B_addi_x0 CARG2, zero, LUA_MINSTACK
+  |    B_b_x1 >2
   |
   |->vm_growstack_l:			// Grow stack for Lua function.
   |  // BASE = new base, RA = BASE+framesize*8, RC = nargs*8, PC = first PC
-  |  add RC, BASE, RC
-  |   sub RA, RA, BASE
-  |  addlo AT, L:LREG->base
-  |  st AT, BASE
-  |   addli PC, PC, 4			// Must point after first instruction.
-  |  addlo AT, L:LREG->top
-  |  st AT, RC
-  |   shrui CARG2, RA, 3
+  |  B_X
+  |    B_add_x0 RC, BASE, RC
+  |    B_sub_x1 RA, RA, BASE
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_addli_x1 PC, PC, 4			// Must point after first instruction.
+  |  B_X
+  |    B_addlo_x0 AT1, L:LREG->top
+  |    B_st_x1 AT, BASE
+  |  B_X
+  |    B_shrui_x0 CARG2, RA, 3
+  |    B_st_x1 AT1, RC
   |2:
   |  // L->base = new base, L->top = top
-  |  load_got lj_state_growstack
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  move CARG1, L
+  |  //load_got lj_state_growstack
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_state_growstack)
+  |    B_addi_x1 AT, sp, SAVE_PC
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    B_st_x1 AT, PC
+  |  ld CFUNCADDR, CFUNCADDR
   |  call_intern lj_state_growstack	// (lua_State *L, int n)
   |  addlo BASE, L:LREG->base
-  |  ld BASE, BASE
-  |  addlo RC, L:LREG->top
-  |  ld RC, RC
-  |  addi LFUNC:RB, BASE, FRAME_FUNC
-  |  ld4s LFUNC:RB, LFUNC:RB
-  |  sub RC, RC, BASE
+  |  B_X
+  |    B_addlo_x0 RC, L:LREG->top
+  |    B_ld_x1 BASE, BASE
+  |  B_X
+  |    B_addi_x0 LFUNC:RB, BASE, FRAME_FUNC
+  |    B_ld_x1 RC, RC
+  |  B_X
+  |    B_sub_x0 RC, RC, BASE
+  |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
   |  // BASE = new base, RB = LFUNC/CFUNC, RC = nargs*8, FRAME_PC(BASE) = PC
   |  ins_callt				// Just retry the call.
   |
