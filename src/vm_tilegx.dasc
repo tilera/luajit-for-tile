@@ -1641,48 +1641,68 @@ static void build_subroutines(BuildCtx *ctx)
   |  move CARG4, CARG3
   |
   |->vmeta_arith:
-  |  load_got lj_meta_arith
-  |  decode_OP1 TMP0, INS
-  |   addlo AT, L:LREG->base
-  |   st AT, BASE
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  move CARG2, RA
-  |  move ARG5, TMP0
-  |  move CARG1, L
-  |  call_intern lj_meta_arith  // (lua_State *L, TValue *ra,*rb,*rc, BCReg op)
+  |  //load_got lj_meta_arith
+  |  //decode_OP1 TMP0, INS
+  |  B_X
+  |    B_bfextu_x0 TMP0, INS, 0, 7
+  |    B_addli_x1 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_arith)
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addi_x0 AT1, sp, SAVE_PC
+  |    B_st_x1 AT, BASE
+  |  B_Y3
+  |    B_move_y0 CARG2, RA
+  |    B_move_y1 ARG5, TMP0
+  |    B_st_y2 AT1, PC
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    //call_intern lj_meta_arith  // (lua_State *L, TValue *ra,*rb,*rc, BCReg op)
+  |    B_jalr_x1 CFUNCADDR
   |  // Returns NULL (finished) or TValue * (metamethod).
   |  beqz CRET1, ->cont_nop
   |
   |  // Call metamethod for binary op.
   |->vmeta_binop:
   |  // BASE = old base, CRET1 = new base, stack = cont/func/o1/o2
-  |  sub TMP1, CRET1, BASE
-  |   addi AT, CRET1, -16+HI
-  |   st4 AT, PC
-  |   move TMP2, BASE
-  |  addli PC, TMP1, FRAME_CONT
-  |   move BASE, CRET1
-  |  addi NARGS8:RC, zero, 16			// 2 args for func(o1, o2).
-  |  b ->vm_call_dispatch
+  |  B_X
+  |    B_sub_x0 TMP1, CRET1, BASE
+  |    B_addi_x1 AT, CRET1, -16+HI
+  |  B_X
+  |    B_move_x0 TMP2, BASE
+  |    B_st4_x1 AT, PC
+  |  B_X
+  |    B_addli_x0 PC, TMP1, FRAME_CONT
+  |    B_move_x1 BASE, CRET1
+  |  B_X
+  |    B_addi_x1 NARGS8:RC, zero, 16			// 2 args for func(o1, o2).
+  |    B_b_x1 ->vm_call_dispatch
   |
   |->vmeta_len:
   |  // CARG2 already set by BC_LEN.
 #if LJ_52
   |  move MULTRES, CARG1
 #endif
-  |  load_got lj_meta_len
-  |   addlo AT, L:LREG->base
-  |   st AT, BASE
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  move CARG1, L
-  |  call_intern lj_meta_len		// (lua_State *L, TValue *o)
+  |  //load_got lj_meta_len
+  |  addli CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_len)
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addi_x0 AT1, sp, SAVE_PC
+  |    B_st_x1 AT, BASE
+  |  st AT1, PC
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    //call_intern lj_meta_len		// (lua_State *L, TValue *o)
+  |    B_jalr_x1 CFUNCADDR
   |  // Returns NULL (retry) or TValue * (metamethod base).
 #if LJ_52
   |  bnez CRET1, ->vmeta_binop		// Binop call for compatibility.
-  |  move CARG1, MULTRES
-  |  b ->BC_LEN_Z
+  |  B_X
+  |    B_move_x0 CARG1, MULTRES
+  |    B_b_x1 ->BC_LEN_Z
 #else
   |  b ->vmeta_binop			// Binop call for compatibility.
 #endif
@@ -1691,38 +1711,55 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vmeta_call:			// Resolve and call __call metamethod.
   |  // TMP2 = old base, BASE = new base, RC = nargs*8
-  |  load_got lj_meta_call
-  |   addlo AT, L:LREG->base			// This is the callers base!
-  |   st AT, TMP2
-  |  addli CARG2, BASE, -8
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  add CARG3, BASE, RC
-  |   move MULTRES, NARGS8:RC
-  |  move CARG1, L
+  |  // load_got lj_meta_call
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_call)
+  |    B_addi_x1 AT1, sp, SAVE_PC
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base			// This is the callers base!
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addli_x0 CARG2, BASE, -8
+  |    B_st_x1 AT, TMP2
+  |  B_X
+  |    B_add_x0 CARG3, BASE, RC
+  |    B_st_x1 AT1, PC
+  |  B_X
+  |    B_move_x0 MULTRES, NARGS8:RC
+  |    B_move_x1 CARG1, L
   |  call_intern lj_meta_call	// (lua_State *L, TValue *func, TValue *top)
   |  addi LFUNC:RB, BASE, FRAME_FUNC
-  |  ld4s LFUNC:RB, LFUNC:RB
-  |   addli NARGS8:RC, MULTRES, 8	// Got one more argument now.
+  |  B_X
+  |    B_addli_x0 NARGS8:RC, MULTRES, 8	// Got one more argument now.
+  |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
   |  ins_call
   |
   |->vmeta_callt:			// Resolve __call for BC_CALLT.
   |  // BASE = old base, RA = new base, RC = nargs*8
-  |  load_got lj_meta_call
-  |   addlo AT, L:LREG->base
-  |   st AT, BASE
-  |  addli CARG2, RA, -8
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  add CARG3, RA, RC
-  |   move MULTRES, NARGS8:RC
-  |  move CARG1, L
+  |  // load_got lj_meta_call
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_call)
+  |    B_addi_x1 AT1, sp, SAVE_PC
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addli_x0 CARG2, RA, -8
+  |    B_st_x1 AT, BASE
+  |  B_X
+  |    B_add_x0 CARG3, RA, RC
+  |    B_st_x1 AT1, PC
+  |  B_X
+  |    B_move_x0 MULTRES, NARGS8:RC
+  |    B_move_x1 CARG1, L
   |  call_intern lj_meta_call	// (lua_State *L, TValue *func, TValue *top)
   |  addi TMP1, BASE, FRAME_PC
-  |  ld4s TMP1, TMP1
-  |   addi LFUNC:RB, RA, FRAME_FUNC
-  |   ld4s LFUNC:RB, LFUNC:RB
-  |  addli NARGS8:RC, MULTRES, 8	// Got one more argument now.
+  |  B_X
+  |    B_addi_x0 LFUNC:RB, RA, FRAME_FUNC
+  |    B_ld4s_x1 TMP1, TMP1
+  |  B_X
+  |    B_addli_x0 NARGS8:RC, MULTRES, 8	// Got one more argument now.
+  |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
   |  b ->BC_CALLT_Z
   |
   |//-- Argument coercion for 'for' statement ------------------------------
