@@ -799,7 +799,7 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_andi_x0 AT, PC, FRAME_P
   |    B_lnk_x1 ASMENTRY
   |  B_X
-  |    B_addi_x0 TMP1, zero, -3 //LJ_TTRUE
+  |    B_addi_x0 TMP1, zero, LJ_TTRUE
   |    B_beqz_x1 AT, ->cont_dispatch
   |
   |  // Return from pcall or xpcall fast func.
@@ -1194,7 +1194,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  B_X
   |    //li_vmstate INTERP
   |    B_moveli_x0 TMP0, ~LJ_VMST_INTERP
-  |    B_moveli_x1 TISNIL, -1//LJ_TNIL
+  |    B_moveli_x1 TISNIL, LJ_TNIL
   |  st_vmstate
   |
   |->vm_call_dispatch:
@@ -1365,7 +1365,7 @@ static void build_subroutines(BuildCtx *ctx)
   |->vmeta_tgets1:
   |  B_X
   |    B_addli_x0 CARG3, DISPATCH, DISPATCH_GL(tmptv)
-  |    B_addi_x1 TMP0, zero, -5 //LJ_TSTR
+  |    B_addi_x1 TMP0, zero, LJ_TSTR
   |  B_X
   |    B_addi_x0 AT, CARG3, HI
   |    B_st4_x1 CARG3, STR:RC
@@ -1375,7 +1375,7 @@ static void build_subroutines(BuildCtx *ctx)
   |->vmeta_tgets:
   |  B_X
   |    B_addli_x0 CARG2, DISPATCH, DISPATCH_GL(tmptv)
-  |    B_addi_x1 TMP0, zero, -12 //LJ_TTAB
+  |    B_addi_x1 TMP0, zero, LJ_TTAB
   |  B_X
   |    B_addli_x0 CARG3, DISPATCH, DISPATCH_GL(tmptv2)
   |    B_st4_x1 CARG2, TAB:RB
@@ -1448,7 +1448,7 @@ static void build_subroutines(BuildCtx *ctx)
   |->vmeta_tsets1:
   |  B_X
   |    B_addli_x0 CARG3, DISPATCH, DISPATCH_GL(tmptv)
-  |    B_addi_x1 TMP0, zero, -5 // LJ_TSTR
+  |    B_addi_x1 TMP0, zero, LJ_TSTR
   |  B_X
   |    B_addi_x0 AT, CARG3, HI
   |    B_st4_x1 CARG3, STR:RC
@@ -1458,7 +1458,7 @@ static void build_subroutines(BuildCtx *ctx)
   |->vmeta_tsets:
   |  B_X
   |    B_addli_x0 CARG2, DISPATCH, DISPATCH_GL(tmptv)
-  |    B_addi_x1 TMP0, zero, -12 // LJ_TTAB
+  |    B_addi_x1 TMP0, zero, LJ_TTAB
   |  B_X
   |    B_addli_x0 CARG3, DISPATCH, DISPATCH_GL(tmptv2)
   |    B_st4_x1 CARG2, TAB:RB
@@ -1765,30 +1765,52 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Argument coercion for 'for' statement ------------------------------
   |
   |->vmeta_for:
-  |  load_got lj_meta_for
-  |   addlo AT, L:LREG->base
-  |   st AT, BASE
-  |  move CARG2, RA
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  move MULTRES, INS
-  |  move CARG1, L
+  |  // load_got lj_meta_for
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_for)
+  |    B_addi_x1 AT1, sp, SAVE_PC
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_move_x0 CARG2, RA
+  |    B_st_x1 AT, BASE
+  |  B_Y3
+  |    B_move_y0 MULTRES, INS
+  |    B_move_y1 CARG1, L
+  |    B_st_y2 AT1, PC
   |  call_intern lj_meta_for	// (lua_State *L, TValue *base)
   |.if JIT
-  |  decode_OP1 TMP0, MULTRES
-  |  addi AT, zero, BC_JFORI
+  |  B_X
+  |    //decode_OP1 TMP0, MULTRES
+  |    B_bfextu_x0 TMP0, MULTRES, 0, 7
+  |    B_addi_x1 AT, zero, BC_JFORI
   |.endif
-  |  decode_RA8a RA, MULTRES
-  |   decode_RD8a RD, MULTRES
-  |  decode_RA8b RA
+  |    // decode_RA8a RA, MULTRES
+  |    // decode_RD8a RD, MULTRES
+  |  B_X
+  |    B_shrui_x0 RA, MULTRES, 5
+  |    B_shrui_x1 RD, MULTRES, 16
   |.if JIT
-  |  decode_RD8b RD
-  |  cmpeq AT1, TMP0, AT
+  |  // decode_RA8b RA
+  |  // decode_RD8b RD
+  |  B_X
+  |    B_bfextu_x0 RA, RA, 3, 10
+  |    B_shli_x1 RD, RD, 3
+  |  B_X
+  |    B_shli_x0 RA, RA, 3
+  |    B_cmpeq_x1 AT1, TMP0, AT
   |  bnez AT1, =>BC_JFORI
   |  b =>BC_FORI
   |.else
-  |  decode_RD8b RD
-  |  b =>BC_FORI
+  |  // decode_RA8b RA
+  |  // decode_RD8b RD
+  |  B_X
+  |    B_bfextu_x0 RA, RA, 3, 10
+  |    B_shli_x1 RD, RD, 3
+  |  B_X
+  |    B_shli_x0 RA, RA, 3
+  |    B_b_x1 =>BC_FORI
   |.endif
   |
   |//-----------------------------------------------------------------------
@@ -1801,22 +1823,24 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.macro .ffunc_1, name
   |->ff_ .. name:
-  |  addi AT, BASE, HI
-  |  ld4s CARG3, AT
-  |  addi AT, BASE, LO
-  |  ld4s CARG1, AT
+  |  addi CARG3, BASE, HI
+  |  B_X
+  |    B_addi_x0 CARG1, BASE, LO
+  |    B_ld4s_x1 CARG3, CARG3
+  |  ld4s CARG1, CARG1
   |  beqz NARGS8:RC, ->fff_fallback
   |.endmacro
   |
   |.macro .ffunc_2, name
   |->ff_ .. name:
-  |  cmpltui AT, NARGS8:RC, 16
-  |   addi CARG3, BASE, HI
-  |   ld4s CARG3, CARG3
-  |  addi AT, BASE, 8+HI
-  |  ld4s CARG4, AT
-  |  addi AT, BASE, LO
-  |  ld4s CARG1, AT
+  |  B_X
+  |    B_cmpltui_x0 AT, NARGS8:RC, 16
+  |    B_addi_x1 CARG3, BASE, HI
+  |  B_X
+  |    B_addi_x0 CARG4, BASE, 8+HI
+  |    B_ld4s_x1 CARG3, CARG3
+  |  ld4s CARG4, CARG4
+  |  ld4s CARG1, BASE
   |  bnez AT, ->fff_fallback
   |  addi CARG2, BASE, 8+LO
   |  ld4s CARG2, CARG2
@@ -1824,9 +1848,10 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.macro .ffunc_n, name	// Caveat: has delay slot!
   |->ff_ .. name:
-  |  addi CARG3, BASE, HI
+  |  B_X
+  |    B_addi_x0 CARG3, BASE, HI
+  |    B_ld_x1 CARG1, BASE
   |  ld4s CARG3, CARG3
-  |  ld CARG1, BASE
   |  beqz NARGS8:RC, ->fff_fallback
   |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
   |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
@@ -1842,19 +1867,24 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.macro .ffunc_nn, name	// Caveat: has delay slot!
   |->ff_ .. name:
-  |  cmpltui AT, NARGS8:RC, 16
-  |   addi CARG3, BASE, HI
-  |   ld4s CARG3, CARG3
-  |  addi CARG4, BASE, 8+HI
+  |  B_X
+  |    B_cmpltui_x0 AT, NARGS8:RC, 16
+  |    B_addi_x1 CARG3, BASE, HI
+  |  B_X
+  |    B_addi_x0 CARG4, BASE, 8+HI
+  |    B_ld4s_x1 CARG3, CARG3
   |  ld4s CARG4, CARG4
   |  bnez AT, ->fff_fallback
-  |  ld CARG1, BASE
-  |  addi AT3, BASE, 8
-  |  ld CARG2, AT3
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  B_X
+  |    B_addi_x0 AT3, BASE, 8
+  |    B_ld_x1 CARG1, BASE
+  |  B_X
+  |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_ld_x1 CARG2, AT3
   |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu TMP0, CARG3, AT
-  |  cmpltu TMP1, CARG4, AT
+  |  B_X
+  |    B_cmpltu_x0 TMP0, CARG3, AT
+  |    B_cmpltu_x1 TMP1, CARG4, AT
   |  and TMP0, TMP0, TMP1
   |  beqz TMP0, ->fff_fallback
   |.endmacro
@@ -1862,8 +1892,9 @@ static void build_subroutines(BuildCtx *ctx)
   |// Inlined GC threshold check. Caveat: uses TMP0 and TMP1 and has delay slot!
   |.macro ffgccheck
   |  addli TMP0, DISPATCH, DISPATCH_GL(gc.total)
-  |  ld4u TMP0, TMP0
-  |  addli TMP1, DISPATCH, DISPATCH_GL(gc.threshold)
+  |  B_X
+  |    B_addli_x0 TMP1, DISPATCH, DISPATCH_GL(gc.threshold)
+  |    B_ld4u_x1 TMP0, TMP0
   |  ld4u TMP1, TMP1
   |  sub AT, TMP0, TMP1
   |  cmplts AT, zero, AT
@@ -1875,27 +1906,35 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Base library: checks -----------------------------------------------
   |
   |.ffunc_1 assert
-  |  cmpltui AT, CARG3, LJ_TISTRUECOND
-  |  addli RA, BASE, -8
+  |  B_X
+  |    B_cmpltui_x0 AT, CARG3, LJ_TISTRUECOND
+  |    B_addli_x1 RA, BASE, -8
   |  beqz AT, ->fff_fallback
-  |  addi PC, BASE, FRAME_PC
-  |  ld4s PC, PC
-  |  addli RD, NARGS8:RC, 8		// Compute (nresults+1)*8.
-  |  add TMP2, RA, NARGS8:RC
-  |   addi AT, RA, HI
-  |   st4 AT, CARG3
-  |  addi TMP1, BASE, 8
-  |  addi AT, RA, LO
+  |  B_X
+  |    B_addi_x0 PC, BASE, FRAME_PC
+  |    B_addli_x1 RD, NARGS8:RC, 8		// Compute (nresults+1)*8.
+  |  B_Y2
+  |    B_add_y0 TMP2, RA, NARGS8:RC
+  |    B_addi_y1 AT, RA, HI
+  |    B_ld4s_y2 PC, PC
+  |  B_X
+  |    B_addi_x0 TMP1, BASE, 8
+  |    B_st4_x1 AT, CARG3
+  |  B_X
+  |    B_addi_x0 AT, RA, LO
+  |    B_cmpeq_x1 AT1, BASE, TMP2
   |  st4 AT, CARG1
-  |  cmpeq AT, BASE, TMP2
-  |  bnez AT, ->fff_res		// Done if exactly 1 argument.
+  |  bnez AT1, ->fff_res		// Done if exactly 1 argument.
   |1:
-  |  ld AT2, TMP1
-  |  addi AT, TMP1, -8
-  |  st AT, AT2
-  |  cmpne AT, TMP1, TMP2
-  |  addli TMP1, TMP1, 8
-  |  bnez AT, <1
+  |  B_X
+  |    B_addi_x0 AT, TMP1, -8
+  |    B_ld_x1 AT2, TMP1
+  |  B_X
+  |    B_cmpne_x0 AT1, TMP1, TMP2
+  |    B_st_x1 AT, AT2
+  |  B_X
+  |    B_addli_x0 TMP1, TMP1, 8
+  |    B_bnez_x1 AT1, <1
   |  b ->fff_res
   |
   |.ffunc type
@@ -1905,8 +1944,9 @@ static void build_subroutines(BuildCtx *ctx)
   |  shrsi AT, AT, 15
   |  cmpeqi AT, AT, -2
   |  bnez AT, >3
-  |  movei TMP1, ~LJ_TNUMX
-  |  nor CARG3, CARG3, zero
+  |  B_X
+  |    B_movei_x0 TMP1, ~LJ_TNUMX
+  |    B_nor_x1 CARG3, CARG3, zero
   |  cmpleu TMP0, CARG3, TMP1
   |  cmovnez TMP1, TMP0, CARG3
   |2:
@@ -1916,90 +1956,107 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld CRET1, CRET1
   |  b ->fff_resn
   |3:  
-  |  movei TMP1, ~LJ_TLIGHTUD
-  |  b <2
+  |  B_X
+  |    B_movei_x0 TMP1, ~LJ_TLIGHTUD
+  |    B_b_x1 <2
   |
   |//-- Base library: getters and setters ---------------------------------
   |
   |.ffunc_1 getmetatable
   |  addi AT1, zero, LJ_TTAB
-  |  addi AT, zero, LJ_TUDATA
-  |  cmpne AT1, CARG3, AT1
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TUDATA
+  |    B_cmpne_x1 AT1, CARG3, AT1
   |  bnez AT1, >6
   |1:  // Field metatable must be at same offset for GCtab and GCudata!
   |  addlo TAB:CARG1, TAB:CARG1->metatable
   |  ld4u TAB:CARG1, TAB:CARG1
   |2:
   |  addli STR:RC, DISPATCH, DISPATCH_GL(gcroot[GCROOT_MMNAME+MM_metatable])
-  |  ld4u STR:RC, STR:RC
-  |  addi CARG3, zero, LJ_TNIL
+  |  B_X
+  |    B_addi_x0 CARG3, zero, LJ_TNIL
+  |    B_ld4u_x1 STR:RC, STR:RC
   |  beqz TAB:CARG1, ->fff_restv
-  |  addlo TMP0, TAB:CARG1->hmask
-  |  ld4u TMP0, TMP0
-  |   addi CARG3, zero, LJ_TTAB			// Use metatable as default result.
-  |  addlo TMP1, STR:RC->hash
-  |  ld4u TMP1, TMP1
-  |  addlo NODE:TMP2, TAB:CARG1->node
+  |  B_X
+  |    B_addlo_x0 TMP0, TAB:CARG1->hmask
+  |    B_addi_x1 CARG3, zero, LJ_TTAB			// Use metatable as default result.
+  |  B_X
+  |    B_addlo_x0 TMP1, STR:RC->hash
+  |    B_ld4u_x1 TMP0, TMP0
+  |  B_X
+  |    B_addlo_x0 NODE:TMP2, TAB:CARG1->node
+  |    B_ld4u_x1 TMP1, TMP1
   |  ld4u NODE:TMP2, NODE:TMP2
   |  and TMP1, TMP1, TMP0		// idx = str->hash & tab->hmask
-  |  shli TMP0, TMP1, 5
-  |  shli TMP1, TMP1, 3
+  |  B_X
+  |    B_shli_x0 TMP0, TMP1, 5
+  |    B_shli_x1 TMP1, TMP1, 3
   |  sub TMP1, TMP0, TMP1
-  |  add NODE:TMP2, NODE:TMP2, TMP1	// node = tab->node + (idx*32-idx*8)
-  |  addi AT, zero, LJ_TSTR
+  |  B_X
+  |    B_add_x0 NODE:TMP2, NODE:TMP2, TMP1	// node = tab->node + (idx*32-idx*8)
+  |    B_addi_x1 AT, zero, LJ_TSTR
   |3:  // Rearranged logic, because we expect _not_ to find the key.
   |  addi CARG4, NODE:TMP2, offsetof(Node, key)+HI
-  |  ld4s CARG4, CARG4
-  |  addi TMP0, NODE:TMP2, offsetof(Node, key)+LO
-  |   ld4s TMP0, TMP0
-  |    addlo NODE:TMP3, NODE:TMP2->next
-  |    ld4s NODE:TMP3, NODE:TMP3
-  |    addi CARG2, NODE:TMP2, offsetof(Node, val)+HI
-  |    ld4s CARG2, CARG2
-  |  cmpne AT1, CARG4, AT
+  |  B_X
+  |    B_addi_x0 TMP0, NODE:TMP2, offsetof(Node, key)+LO
+  |    B_ld4s_x1 CARG4, CARG4
+  |  B_X
+  |    B_addlo_x0 NODE:TMP3, NODE:TMP2->next
+  |    B_ld4s_x1 TMP0, TMP0
+  |  B_X
+  |    B_addi_x0 CARG2, NODE:TMP2, offsetof(Node, val)+HI
+  |    B_ld4s_x1 NODE:TMP3, NODE:TMP3
+  |  B_X
+  |    B_cmpne_x0 AT1, CARG4, AT
+  |    B_ld4s_x1 CARG2, CARG2
   |  bnez AT1, >4
-  |    addi TMP1, NODE:TMP2, offsetof(Node, val)+LO
-  |    ld4s TMP1, TMP1
-  |  cmpeq AT, TMP0, STR:RC
+  |  addi TMP1, NODE:TMP2, offsetof(Node, val)+LO
+  |  B_X
+  |    B_cmpeq_x0 AT, TMP0, STR:RC
+  |    B_ld4s_x1 TMP1, TMP1
   |  bnez AT, >5
   |4:
-  |  move NODE:TMP2, NODE:TMP3
-  |  beqz NODE:TMP3, ->fff_restv	// Not found, keep default result.
+  |  B_X
+  |    B_move_x0 NODE:TMP2, NODE:TMP3
+  |    B_beqz_x1 NODE:TMP3, ->fff_restv	// Not found, keep default result.
   |  b <3
   |5:
   |  cmpeq AT, CARG2, TISNIL
   |  bnez AT, ->fff_restv	// Ditto for nil value.
-  |  move CARG3, CARG2			// Return value of mt.__metatable.
-  |  move CARG1, TMP1
+  |  B_X
+  |    B_move_x0 CARG3, CARG2			// Return value of mt.__metatable.
+  |    B_move_x1 CARG1, TMP1
   |  b ->fff_restv
   |
   |6:
-  |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu TMP0, CARG3, AT1
-  |  cmpeq AT1, CARG3, AT
+  |  moveli AT2, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli AT2, AT2, (short)(LJ_TISNUM & 0xFFFF)
+  |  B_X
+  |    B_cmpltu_x0 TMP0, CARG3, AT2
+  |    B_cmpeq_x1 AT1, CARG3, AT
   |  bnez AT1, <1
-  |  moveli TMP1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli TMP1, TMP1, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmoveqz TMP1, TMP0, CARG3
-  |  nor TMP1, TMP1, zero
-  |  shli TMP1, TMP1, 2
-  |  add TMP1, DISPATCH, TMP1
-  |  addli TAB:CARG1, TMP1, DISPATCH_GL(gcroot[GCROOT_BASEMT])
+  |  cmoveqz AT2, TMP0, CARG3
+  |  nor AT2, AT2, zero
+  |  shli AT2, AT2, 2
+  |  add AT2, DISPATCH, AT2
+  |  addli TAB:CARG1, AT2, DISPATCH_GL(gcroot[GCROOT_BASEMT])
   |  ld TAB:CARG1, TAB:CARG1
   |  b <2
   |
   |.ffunc_2 setmetatable
   |  // Fast path: no mt for table yet and not clearing the mt.
-  |  addi AT, zero, LJ_TTAB
-  |  addli CARG4, CARG4, -LJ_TTAB
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TTAB
+  |    B_addli_x1 CARG4, CARG4, -LJ_TTAB
   |  cmpne AT, CARG3, AT
   |  bnez AT, ->fff_fallback
   |  addlo TAB:TMP1, TAB:CARG1->metatable
-  |  ld4u TAB:TMP1, TAB:TMP1
-  |   addlo TMP3, TAB:CARG1->marked
-  |   ld1u TMP3, TMP3
-  |  or AT, CARG4, TAB:TMP1
+  |  B_X
+  |    B_addlo_x0 TMP3, TAB:CARG1->marked
+  |    B_ld4u_x1 TAB:TMP1, TAB:TMP1
+  |  B_X
+  |    B_or_x0 AT, CARG4, TAB:TMP1
+  |    B_ld1u_x1 TMP3, TMP3
   |  andi AT, TMP3, LJ_GC_BLACK	// isblack(table)
   |  bnez AT, ->fff_fallback
   |  addlo AT1, TAB:CARG1->metatable
@@ -2008,17 +2065,24 @@ static void build_subroutines(BuildCtx *ctx)
   |  barrierback TAB:CARG1, TMP3, TMP0, ->fff_restv
   |
   |.ffunc rawget
-  |  addi CARG4, BASE, HI
-  |  ld4s CARG4, CARG4
-  |   cmpltui AT, NARGS8:RC, 16
-  |    addi TAB:CARG2, BASE, LO
-  |    ld4s TAB:CARG2, TAB:CARG2
-  |  load_got lj_tab_get
-  |  addli CARG4, CARG4, -LJ_TTAB
+  |  B_X
+  |    B_addi_x0 CARG4, BASE, HI
+  |    B_cmpltui_x1 AT, NARGS8:RC, 16
+  |  B_X
+  |    B_addi_x0 TAB:CARG2, BASE, LO
+  |    B_ld4s_x1 CARG4, CARG4
+  |  B_X
+  |    // load_got lj_tab_get
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_tab_get)
+  |    B_ld4s_x1 TAB:CARG2, TAB:CARG2
+  |  B_X
+  |    B_addli_x0 CARG4, CARG4, -LJ_TTAB
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
   |  or AT, AT, CARG4
   |  bnez AT, ->fff_fallback
-  |   addli CARG3, BASE, 8
-  |  move CARG1, L
+  |  B_X
+  |    B_addli_x0 CARG3, BASE, 8
+  |    B_move_x1 CARG1, L
   |  call_intern lj_tab_get	// (lua_State *L, GCtab *t, cTValue *key)
   |  // Returns cTValue *.
   |  ld AT2, CRET1
@@ -2028,10 +2092,12 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc tonumber
   |  // Only handles the number case inline (without a base argument).
-  |  addi CARG1, BASE, HI
-  |  ld4s CARG1, CARG1
-  |  xori AT, NARGS8:RC, 8
-  |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  B_X
+  |    B_addi_x0 CARG1, BASE, HI
+  |    B_xori_x1 AT, NARGS8:RC, 8
+  |  B_X
+  |    B_moveli_x0 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_ld4s_x1 CARG1, CARG1
   |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
   |  cmpltu CARG1, CARG1, AT1
   |  cmovnez CARG1, AT, zero
@@ -2041,113 +2107,152 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc_1 tostring
   |  // Only handles the string or number case inline.
-  |  addi AT, zero, LJ_TSTR
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TSTR
   |  // A __tostring method in the string base metatable is ignored.
   |  // Handle numbers inline, unless a number base metatable is present.
-  |  addli TMP1, DISPATCH, DISPATCH_GL(gcroot[GCROOT_BASEMT_NUM])
-  |  ld4u TMP1, TMP1
-  |  cmpeq AT, CARG3, AT
-  |  bnez AT, ->fff_restv			// String key?
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu TMP0, CARG3, AT
-  |  cmpltui TMP1, TMP1, 1
-  |  and TMP0, TMP0, TMP1
-  |  addlo AT, L:LREG->base			// Add frame since C call can throw.
+  |    B_addli_x1 TMP1, DISPATCH, DISPATCH_GL(gcroot[GCROOT_BASEMT_NUM])
+  |  B_X
+  |    B_cmpeq_x0 AT, CARG3, AT
+  |    B_ld4u_x1 TMP1, TMP1
+  |  B_X
+  |    B_moveli_x0 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_bnez_x1 AT, ->fff_restv			// String key?
+  |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
+  |  B_X
+  |    B_cmpltu_x0 TMP0, CARG3, AT1
+  |    B_cmpltui_x1 TMP1, TMP1, 1
+  |  B_X
+  |    B_and_x0 TMP0, TMP0, TMP1
+  |    B_addlo_x1 AT, L:LREG->base			// Add frame since C call can throw.
   |  st AT, BASE
   |  beqz TMP0, ->fff_fallback
   |  addi AT, sp, SAVE_PC
-  |  st AT, PC
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_str_fromnum)
+  |    B_st_x1 AT, PC
   |  ffgccheck
-  |  load_got lj_str_fromnum
-  |  move CARG1, L
-  |  move CARG2, BASE
+  |  // load_got lj_str_fromnum
+  |  B_Y2
+  |    B_move_y0 CARG1, L
+  |    B_move_y1 CARG2, BASE
+  |    B_ld_y2 CFUNCADDR, CFUNCADDR
   |  call_intern lj_str_fromnum		// (lua_State *L, lua_Number *np)
   |  // Returns GCstr *.
-  |  addi CARG3, zero, LJ_TSTR
-  |  //move CARG1, CRET1
-  |  b ->fff_restv
+  |  B_X
+  |    B_addi_x0 CARG3, zero, LJ_TSTR
+  |    //move CARG1, CRET1
+  |    B_b_x1 ->fff_restv
   |
   |//-- Base library: iterators -------------------------------------------
   |
   |.ffunc next
   |  addi CARG1, BASE, HI
   |  ld4s CARG1, CARG1
-  |   addi TAB:CARG2, BASE, LO
-  |   ld4s TAB:CARG2, TAB:CARG2
-  |  add TMP2, BASE, NARGS8:RC
+  |  B_X
+  |    B_add_x0 TMP2, BASE, NARGS8:RC
+  |    B_ld4s_x1 TAB:CARG2, BASE
   |  beqz NARGS8:RC, ->fff_fallback
-  |  addi AT, zero, LJ_TTAB
-  |   addi AT1, TMP2, HI
-  |   st4 AT1, TISNIL
-  |  addi PC, BASE, FRAME_PC
-  |  ld4s PC, PC
-  |  cmpne AT1, CARG1, AT
-  |  bnez AT1, ->fff_fallback
-  |  load_got lj_tab_next
-  |   addlo AT, L->base			// Add frame since C call can throw.
-  |   st AT, BASE
-  |   addlo AT, L->top			// Add frame since C call can throw.
-  |   st AT, BASE
-  |  addli CARG3, BASE, 8
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  move CARG1, L
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TTAB
+  |    B_addi_x1 AT1, TMP2, HI
+  |  B_X
+  |    B_addi_x0 PC, BASE, FRAME_PC
+  |    B_st4_x1 AT1, TISNIL
+  |  B_X
+  |    B_cmpne_x0 AT1, CARG1, AT
+  |    B_ld4s_x1 PC, PC
+  |  B_X
+  |    // load_got lj_tab_next
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_tab_next)
+  |    B_bnez_x1 AT1, ->fff_fallback
+  |  B_X
+  |    B_addlo_x0 AT, L->base			// Add frame since C call can throw.
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addlo_x0 AT1, L->top			// Add frame since C call can throw.
+  |    B_st_x1 AT, BASE
+  |  B_X
+  |    B_addli_x0 CARG3, BASE, 8
+  |    B_st_x1 AT1, BASE
+  |  addi AT, sp, SAVE_PC
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    B_st_x1 AT, PC
   |  call_intern lj_tab_next		// (lua_State *L, GCtab *t, TValue *key)
   |  // Returns 0 at end of traversal.
-  |  addi CARG3, zero, LJ_TNIL
-  |  beqz CRET1, ->fff_restv		// End of traversal: return nil.
+  |  B_X
+  |    B_addi_x0 CARG3, zero, LJ_TNIL
+  |    B_beqz_x1 CRET1, ->fff_restv		// End of traversal: return nil.
   |  addi AT2, BASE, 8
-  |  ld AT2, AT2
-  |    addli RA, BASE, -8
-  |   addi AT3, BASE, 16
-  |   ld AT3, AT3
-  |    addi RD, zero, (2+1)*8
-  |  st RA, AT2
-  |  addi AT2, RA, 8
-  |  st AT2, AT3
+  |  B_Y2
+  |    B_addi_y0 RA, BASE, -8
+  |    B_addi_y1 AT3, BASE, 16
+  |    B_ld_y2 AT2, AT2
+  |  B_X
+  |    B_addi_x0 RD, zero, (2+1)*8
+  |    B_ld_x1 AT3, AT3
+  |  B_X
+  |    B_addi_x0 AT, RA, 8
+  |    B_st_x1 RA, AT2
+  |  st AT, AT3
   |  b ->fff_res
   |
   |.ffunc_1 pairs
-  |  addi AT, zero, LJ_TTAB
-  |  addi PC, BASE, FRAME_PC
-  |  ld4s PC, PC
-  |  cmpne AT, CARG3, AT
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TTAB
+  |    B_addi_x1 PC, BASE, FRAME_PC
+  |  B_X
+  |    B_cmpne_x0 AT, CARG3, AT
+  |    B_ld4s_x1 PC, PC
   |  bnez AT, ->fff_fallback
-  |  addli RA, BASE, -8
 #if LJ_52
-  |  addlo TAB:TMP2, TAB:CARG1->metatable
-  |  ld4u TAB:TMP2, TAB:TMP2
-  |   addlo AT2, CFUNC:RB->upvalue[0]
-  |   ld AT2, AT2
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_addlo_x1 TAB:TMP2, TAB:CARG1->metatable
+  |  B_X
+  |    B_addlo_x0 AT2, CFUNC:RB->upvalue[0]
+  |    B_ld4u_x1 TAB:TMP2, TAB:TMP2
+  |  ld AT2, AT2
   |  bnez TAB:TMP2, ->fff_fallback
 #else
-  |  addlo AT2, CFUNC:RB->upvalue[0]
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_addlo_x1 AT2, CFUNC:RB->upvalue[0]
   |  ld AT2, AT2
 #endif
-  |   addi AT, BASE, 8+HI
-  |   st4 AT, TISNIL
-  |  addi RD, zero, (3+1)*8
-  |  st RA, AT2
+  |  B_X
+  |    B_addi_x0 AT, BASE, 8+HI
+  |    B_st_x1 RA, AT2
+  |  B_X
+  |    B_addi_x0 RD, zero, (3+1)*8
+  |    B_st4_x1 AT, TISNIL
   |  b ->fff_res
   |
   |.ffunc ipairs_aux
-  |  cmpltui AT, NARGS8:RC, 16
-  |   addi CARG3, BASE, HI
-  |   ld4s CARG3, CARG3
-  |    addi TAB:CARG1, BASE, LO
-  |    ld4s TAB:CARG1, TAB:CARG1
-  |   addi CARG4, BASE, 8+HI
-  |   ld4s CARG4, CARG4
-  |  addi CARG2, BASE, 8
+  |  B_X
+  |    B_cmpltui_x0 AT, NARGS8:RC, 16
+  |    B_addi_x1 CARG3, BASE, HI
+  |  B_X
+  |    B_addi_x0 TAB:CARG1, BASE, LO
+  |    B_ld4s_x1 CARG3, CARG3
+  |  B_X
+  |    B_addi_x0 CARG4, BASE, 8+HI
+  |    B_ld4s_x1 TAB:CARG1, TAB:CARG1
+  |  B_X
+  |    B_addi_x0 CARG2, BASE, 8
+  |    B_ld4s_x1 CARG4, CARG4
   |  ld CARG2, CARG2
-  |  bnez AT, ->fff_fallback
-  |   addli CARG3, CARG3, -LJ_TTAB
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+  |  B_X
+  |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_bnez_x1 AT, ->fff_fallback
+  |  B_X
+  |    B_addli_x0 CARG3, CARG3, -LJ_TTAB
+  |    B_shl16insli_x1 AT, AT, (short)(LJ_TISNUM & 0xFFFF)
   |  cmpltu AT, CARG4, AT
-  |  cmovnez AT, CARG3, zero
-  |  addi PC, BASE, FRAME_PC
+  |  B_X
+  |    B_cmovnez_x0 AT, CARG3, zero
+  |    B_addi_x1 PC, BASE, FRAME_PC
   |  ld4s PC, PC
   |  beqz AT, ->fff_fallback
   |   //cvt.w.d FRET1, FARG2

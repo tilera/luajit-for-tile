@@ -328,6 +328,8 @@ local map_op = {
   B_move_y1_2 =		"00BBF0004DA",
   B_add_x0_3 =		"500C00001DAB",
   B_add_x1_3 =		"500C00002DAB",
+  B_add_y0_3 =		"005400004DAB",
+  B_add_y1_3 =		"006400004DAB",
   B_addi_x0_3 =		"401000001DAe",
   B_addi_x1_3 =		"301000002DAE",
   -- Y0/Y1 IMM8 relocation offset are the same with X0/X1,
