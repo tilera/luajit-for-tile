@@ -1533,27 +1533,38 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vmeta_comp:
   |  // CARG2, CARG3 are already set by BC_ISLT/BC_ISGE/BC_ISLE/BC_ISGT.
-  |  load_got lj_meta_comp
-  |  addli PC, PC, -4
-  |  addlo AT, L:LREG->base
-  |  st AT, BASE
-  |  addi AT, sp, SAVE_PC
-  |  st AT, PC
-  |  decode_OP1 CARG4, INS
-  |  move CARG1, L
-  |  call_intern lj_meta_comp	// (lua_State *L, TValue *o1, *o2, int op)
+  |  // load_got lj_meta_comp
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_comp)
+  |    B_addli_x1 PC, PC, -4
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addi_x0 AT1, sp, SAVE_PC
+  |    B_st_x1 AT, BASE
+  |  B_X
+  |    B_bfextu_x0 CARG4, INS, 0, 7
+  |    B_st_x1 AT1, PC
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    //call_intern lj_meta_comp	// (lua_State *L, TValue *o1, *o2, int op)
+  |    B_jalr_x1 CFUNCADDR
   |  // Returns 0/1 or TValue * (metamethod).
   |3:
   |  cmpltui AT, CRET1, 2
   |  beqz AT, ->vmeta_binop
   |  sub TMP2, zero, CRET1
   |4:
-  |  addi RD, PC, OFS_RD
-  |  ld2u RD, RD
-  |   addli PC, PC, 4
-  |   moveli TMP1, (-(BCBIAS_J*4 >> 16) & 65535)
-  |   shl16insli TMP1, TMP1, 0
-  |  shli RD, RD, 2
+  |  B_X
+  |    B_addi_x0 RD, PC, OFS_RD
+  |    B_addli_x1 PC, PC, 4
+  |  B_X
+  |    B_moveli_x0 TMP1, (-(BCBIAS_J*4 >> 16) & 65535)
+  |    B_ld2u_x1 RD, RD
+  |  B_X
+  |    B_shl16insli_x0 TMP1, TMP1, 0
+  |    B_shli_x1 RD, RD, 2
   |  add RD, RD, TMP1
   |  and RD, RD, TMP2
   |  add PC, PC, RD
@@ -1563,8 +1574,9 @@ static void build_subroutines(BuildCtx *ctx)
   |->cont_ra:				// RA = resultptr
   |  addi TMP1, PC, -4+OFS_RA
   |  ld1u TMP1, TMP1
-  |   ld AT, RA
-  |  shli TMP1, TMP1, 3
+  |  B_X
+  |    B_shli_x0 TMP1, TMP1, 3
+  |    B_ld_x1 AT, RA
   |  add TMP1, BASE, TMP1
   |  st TMP1, AT
   |  b ->cont_nop
@@ -1585,27 +1597,39 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vmeta_equal:
   |  // CARG2, CARG3, CARG4 are already set by BC_ISEQV/BC_ISNEV.
-  |  load_got lj_meta_equal
-  |  addli PC, PC, -4
-  |   addlo AT, L:LREG->base
-  |   st AT, BASE
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  move CARG1, L
+  |  // load_got lj_meta_equal
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_equal)
+  |    B_addli_x1 PC, PC, -4
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addi_x0 AT1, sp, SAVE_PC
+  |    B_st_x1 AT, BASE
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    B_st_x1 AT1, PC
   |  call_intern lj_meta_equal  // (lua_State *L, GCobj *o1, *o2, int ne)
   |  // Returns 0/1 or TValue * (metamethod).
   |  b <3
   |
   |->vmeta_equal_cd:
   |.if FFI
-  |  load_got lj_meta_equal_cd
-  |  move CARG2, INS
-  |  addli PC, PC, -4
-  |   addlo AT, L:LREG->base
-  |   st AT, BASE
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  move CARG1, L
+  |  //load_got lj_meta_equal_cd
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_equal)
+  |    B_move_x1 CARG2, INS
+  |  B_X
+  |    B_addli_x0 PC, PC, -4
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  addlo AT, L:LREG->base
+  |  B_X
+  |    B_addi_x0 AT1, sp, SAVE_PC
+  |    B_st_x1 AT, BASE
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    B_st_x1 AT1, PC
   |  call_intern lj_meta_equal_cd	// (lua_State *L, BCIns op)
   |  // Returns 0/1 or TValue * (metamethod).
   |  b <3
