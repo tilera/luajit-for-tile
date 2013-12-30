@@ -1761,7 +1761,7 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_addli_x0 PC, TMP1, FRAME_CONT
   |    B_move_x1 BASE, CRET1
   |  B_X
-  |    B_addi_x1 NARGS8:RC, zero, 16			// 2 args for func(o1, o2).
+  |    B_addi_x0 NARGS8:RC, zero, 16			// 2 args for func(o1, o2).
   |    B_b_x1 ->vm_call_dispatch
   |
   |->vmeta_len:
@@ -2452,39 +2452,50 @@ static void build_subroutines(BuildCtx *ctx)
   |  addli TMP3, DISPATCH, DISPATCH_GL(hookmask)
   |  ld1u TMP3, TMP3
   |  beqz NARGS8:RC, ->fff_fallback
-  |   move TMP2, BASE
-  |   addli BASE, BASE, 8
+  |  B_X
+  |    B_move_x0 TMP2, BASE
+  |    B_addli_x1 BASE, BASE, 8
   |  // Remember active hook before pcall.
   |  shrui TMP3, TMP3, HOOK_ACTIVE_SHIFT
   |  andi TMP3, TMP3, 1
-  |  addli PC, TMP3, 8+FRAME_PCALL
-  |  addli NARGS8:RC, NARGS8:RC, -8
+  |  B_X
+  |    B_addli_x0 PC, TMP3, 8+FRAME_PCALL
+  |    B_addli_x1 NARGS8:RC, NARGS8:RC, -8
   |  b ->vm_call_dispatch
   |
   |.ffunc xpcall
-  |    cmpltui AT, NARGS8:RC, 16
-  |  addi CARG4, BASE, 8+HI
-  |  ld4s CARG4, CARG4
-  |  addi AT2, BASE, 8
+  |  B_X
+  |    B_cmpltui_x0 AT, NARGS8:RC, 16
+  |    B_addi_x1 CARG4, BASE, 8+HI
+  |  B_X
+  |    B_addi_x0 AT2, BASE, 8
+  |    B_ld4s_x1 CARG4, CARG4
   |  ld AT2, AT2
-  |    bnez AT, ->fff_fallback
-  |   ld AT3, BASE
-  |    addli TMP1, DISPATCH, DISPATCH_GL(hookmask)
-  |    ld1u TMP1, TMP1
-  |  addi AT, zero, LJ_TFUNC
-  |   move TMP2, BASE
-  |  cmpne AT1, CARG4, AT
+  |  bnez AT, ->fff_fallback
+  |  B_X
+  |    B_addli_x0 TMP1, DISPATCH, DISPATCH_GL(hookmask)
+  |    B_ld_x1 AT3, BASE
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TFUNC
+  |    B_ld1u_x1 TMP1, TMP1
+  |  B_X
+  |    B_move_x0 TMP2, BASE
+  |    B_cmpne_x1 AT1, CARG4, AT
   |  bnez AT1, ->fff_fallback  // Traceback must be a function.
-  |   addli BASE, BASE, 16
-  |  // Remember active hook before pcall.
-  |  shrui TMP3, TMP3, HOOK_ACTIVE_SHIFT
-  |   st TMP2, AT2		// Swap function and traceback.
-  |  andi TMP3, TMP3, 1
-  |   addi AT, TMP2, 8
-  |   st AT, AT3
-  |  addli PC, TMP3, 16+FRAME_PCALL
-  |  addli NARGS8:RC, NARGS8:RC, -16
-  |  b ->vm_call_dispatch
+  |  B_X
+  |    B_addli_x0 BASE, BASE, 16
+  |    // Remember active hook before pcall.
+  |    B_shrui_x1 TMP3, TMP3, HOOK_ACTIVE_SHIFT
+  |  B_Y3
+  |    B_andi_y0 TMP3, TMP3, 1
+  |    B_addi_y1 AT, TMP2, 8
+  |    B_st_y2 TMP2, AT2  // Swap function and traceback.
+  |  B_X
+  |    B_addli_x0 PC, TMP3, 16+FRAME_PCALL
+  |    B_st_x1 AT, AT3
+  |  B_X
+  |    B_addli_x0 NARGS8:RC, NARGS8:RC, -16
+  |    B_b_x1 ->vm_call_dispatch
   |
   |//-- Coroutine library --------------------------------------------------
   |
@@ -2651,45 +2662,61 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_n math_abs
   |->fff_resn:
   |  addi PC, BASE, FRAME_PC
-  |  ld4s PC, PC
-  |  addli RA, BASE, -8
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_ld4s_x1 PC, PC
   |  st RA, CRET1
   |  b ->fff_res1
   |
   |->fff_restv:
   |  // CARG3/CARG1 = TValue result.
   |  addi PC, BASE, FRAME_PC
-  |  ld4s PC, PC
-  |   addi AT, BASE, -8+HI
-  |   st4 AT, CARG3
-  |  addli RA, BASE, -8
-  |   addi AT, BASE, -8+LO
-  |   st4 AT, CARG1
+  |  B_X
+  |    B_addi_x0 AT, BASE, -8+HI
+  |    B_ld4s_x1 PC, PC
+  |  B_Y3
+  |    B_addi_y0 RA, BASE, -8
+  |    B_addi_y1 AT1, BASE, -8
+  |    B_st4_y2 AT, CARG3
+  |  st4 AT1, CARG1
   |->fff_res1:
   |  // RA = results, PC = return.
   |  addi RD, zero, (1+1)*8
   |->fff_res:
   |  // RA = results, RD = (nresults+1)*8, PC = return.
-  |  andi TMP0, PC, FRAME_TYPE
-  |  move MULTRES, RD
-  |  bnez TMP0, ->vm_return
-  |  addi INS, PC, -4
-  |  ld4u INS, INS
-  |  decode_RB8a RB, INS
-  |  decode_RB8b RB
+  |  B_X
+  |    B_andi_x0 TMP0, PC, FRAME_TYPE
+  |    B_move_x1 MULTRES, RD
+  |  B_X
+  |    B_addi_x0 AT, PC, -4
+  |    B_bnez_x1 TMP0, ->vm_return
+  |  ld4u INS, AT
+  |  //decode_RB8a RB, INS
+  |  shrui RB, INS, 21
+  |  //decode_RB8b RB
+  |  bfextu RB, RB, 3, 10
+  |  shli RB, RB, 3
   |5:
-  |  cmpltu AT, RD, RB
-  |  decode_RA8a TMP0, INS
-  |  bnez AT, >6			// More results expected?
-  |  decode_RA8b TMP0
-  |  ins_next1
+  |  B_X
+  |    B_cmpltu_x0 AT, RD, RB
+  |    //decode_RA8a TMP0, INS
+  |    B_shrui_x1 TMP0, INS, 5
+  |  B_X
+  |    B_bfextu_x0 TMP0, TMP0, 3, 10 
+  |    B_bnez_x1 AT, >6			// More results expected?
+  |  B_X
+  |    //decode_RA8b TMP0
+  |    B_shli_x0 TMP0, TMP0, 3
+  |    //ins_next1
+  |    B_ld4u_add_x1 INS, PC, 4
   |  // Adjust BASE. KBASE is assumed to be set for the calling frame.
-  |   sub BASE, RA, TMP0
+  |  sub BASE, RA, TMP0
   |  ins_next2
   |
   |6:  // Fill up results with nil.
-  |  add TMP1, RA, RD
-  |   addli RD, RD, 8
+  |  B_X
+  |    B_add_x0 TMP1, RA, RD
+  |    B_addli_x1 RD, RD, 8
   |  addi AT, TMP1, -8+HI
   |  st4 AT, TISNIL
   |  b <5
@@ -2697,10 +2724,14 @@ static void build_subroutines(BuildCtx *ctx)
   |.macro math_extern, func
   |->ff_math_ .. func:
   |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |  load_got func
-  |  beqz NARGS8:RC, ->fff_fallback
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  B_X
+  |    //load_got func
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(func)
+  |    B_ld4s_x1 CARG3, CARG3
+  |  ld CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_beqz_x1 NARGS8:RC, ->fff_fallback
   |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
   |  cmpltu AT, CARG3, AT
   |  beqz AT, ->fff_fallback
@@ -2726,13 +2757,19 @@ static void build_subroutines(BuildCtx *ctx)
   |  math_round ceil
   |
   |.ffunc math_log
-  |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |  addi AT, zero, 8
-  |  load_got log
-  |  cmpne AT1, NARGS8:RC, AT
-  |  bnez AT1, ->fff_fallback
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  B_X
+  |    B_addi_x0 CARG3, BASE, HI
+  |    B_addli_x1 CFUNCADDR, DISPATCH, DISPATCH_GOT(log)
+  |  B_X
+  |    B_addi_x0 AT, zero, 8
+  |    B_ld4s_x1 CARG3, CARG3
+  |  //load_got log
+  |  B_X
+  |    B_cmpne_x0 AT1, NARGS8:RC, AT
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_bnez_x1 AT1, ->fff_fallback
   |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
   |  cmpltu AT, CARG3, AT
   |  beqz AT, ->fff_fallback
@@ -2865,222 +2902,234 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_1 string_len
   |  addi AT, zero, LJ_TSTR
   |  cmpne AT, CARG3, AT
-  |  bnez AT, ->fff_fallback
-  |  addlo CRET1, STR:CARG1->len
-  |  ld4u CRET1, CRET1
+  |  B_X
+  |    B_addlo_x0 AT1, STR:CARG1->len
+  |    B_bnez_x1 AT, ->fff_fallback
+  |  ld4u CRET1, AT1
   |  b ->fff_resi
   |
   |.ffunc string_byte			// Only handle the 1-arg case here.
-  |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |   addi STR:CARG1, BASE, LO
-  |   ld4s STR:CARG1, STR:CARG1
-  |  xori AT, NARGS8:RC, 8
+  |  B_X
+  |    B_addi_x0 CARG3, BASE, HI
+  |    B_ld4s_x1 STR:CARG1, BASE
+  |  B_X
+  |    B_xori_x0 AT, NARGS8:RC, 8
+  |    B_ld4s_x1 CARG3, CARG3
   |  addli CARG3, CARG3, -LJ_TSTR
   |  or AT, AT, CARG3
-  |  bnez AT, ->fff_fallback		// Need exactly 1 string argument.
-  |  addlo TMP0, STR:CARG1->len
-  |  ld4u TMP0, TMP0
-  |   addlo TMP1, STR:CARG1[1]		// Access is always ok (NUL at end).
-  |   ld1u TMP1, TMP1
-  |    addli RA, BASE, -8
+  |  B_X
+  |    B_addlo_x0 AT1, STR:CARG1->len
+  |    B_bnez_x1 AT, ->fff_fallback		// Need exactly 1 string argument.
+  |  B_X
+  |    B_addlo_x0 TMP1, STR:CARG1[1]		// Access is always ok (NUL at end).
+  |    B_ld4u_x1 TMP0, AT1
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_ld1u_x1 TMP1, TMP1
   |  cmpltu RD, r0, TMP0
-  |  addli RD, RD, 1
-  |  cmpltsi AT, TMP1, 0
-  |  sub AT1, zero, TMP1
-  |  moveli AT2, 539
-  |  cmovnez TMP1, AT, AT1
-  |  shli AT2, AT2, 8
-  |  shli AT1, TMP1, 4
-  |  bfins AT2, AT, 20, 20
+  |  B_X
+  |    B_addli_x0 RD, RD, 1
+  |    B_cmpltsi_x1 AT, TMP1, 0
+  |  B_X
+  |    B_sub_x0 AT1, zero, TMP1
+  |    B_moveli_x1 AT2, 539
+  |  B_X
+  |    B_cmovnez_x0 TMP1, AT, AT1
+  |    B_shli_x1 AT2, AT2, 8
+  |  B_X
+  |    B_bfins_x0 AT2, AT, 20, 20
+  |    B_shli_x1 AT1, TMP1, 4
   |  fdouble_pack1 TMP1, AT1, AT2
-  |  fdouble_pack2 TMP1, AT1, zero
-  |  addi PC, BASE, FRAME_PC
-  |  ld4s PC, PC
-  |  shli RD, RD, 3			// RD = ((str->len != 0)+1)*8
+  |  B_X
+  |    B_fdouble_pack2_x0 TMP1, AT1, zero
+  |    B_addi_x1 PC, BASE, FRAME_PC
+  |  B_X
+  |    B_shli_x0 RD, RD, 3			// RD = ((str->len != 0)+1)*8
+  |    B_ld4s_x1 PC, PC
   |  st RA, TMP1
   |  b ->fff_res
   |
   |.ffunc string_char			// Only handle the 1-arg case here.
   |  ffgccheck
-  |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |   ld CARG1, BASE
-  |  addi AT, zero, 8
+  |  B_X
+  |    B_addi_x0 CARG3, BASE, HI
+  |    B_ld_x1 CARG1, BASE
+  |  B_X
+  |    B_addi_x0 AT, zero, 8
+  |    B_ld4s_x1 CARG3, CARG3
   |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
   |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu AT1, CARG3, AT1
-  |  cmpne AT, NARGS8:RC, AT
+  |  B_X
+  |    B_cmpltu_x0 AT1, CARG3, AT1
+  |    B_cmpne_x1 AT, NARGS8:RC, AT
   |  bnez AT, ->fff_fallback
-  |  addi CARG3, zero, 1
-  |  beqz AT1, ->fff_fallback
-  |   //cvt.w.d FARG1, FARG1
-  |  move CROSSTMP1, CARG3
-  |  move CROSSTMP2, TMP0
-  |  move CROSSTMP6, RB
-  |  move CROSSTMP7, RC
-  |  load_got __fixdfsi
-  |  call_extern
-  |  move CARG3, CROSSTMP1
-  |  move TMP0, CROSSTMP2
-  |  move RB, CROSSTMP6
-  |  move RC, CROSSTMP7
-  |  move TMP1, CRET1
-  |  addli AT, zero, 256
-  |  cmpltu AT, TMP0, AT
-  |  addi CARG2, sp, SAVE_MULTRES
+  |  B_X
+  |    B_addi_x0 CARG3, zero, 1
+  |    B_beqz_x1 AT1, ->fff_fallback
+  |  fixdfsi_inline CARG1, AT2, AT3, AT4, AT5
+  |  B_X
+  |    B_move_x0 TMP1, CRET1
+  |    B_addli_x1 AT, zero, 256
+  |  B_X
+  |    B_cmpltu_x0 AT, TMP0, AT
+  |    B_addi_x1 CARG2, sp, SAVE_MULTRES
   |  st CARG2, TMP1
   |  beqz AT, ->fff_fallback
   |->fff_newstr:
-  |  load_got lj_str_new
-  |   addlo AT, L->base
-  |   st AT, BASE
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  move CARG1, L
-  |  call_intern lj_str_new		// (lua_State *L, char *str, size_t l)
-  |  // Returns GCstr *.
-  |  addlo BASE, L->base
-  |  ld BASE, BASE
-  |  move CARG1, CRET1
-  |  addi CARG3, zero, LJ_TSTR
-  |  b ->fff_restv
+  |  addli CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_str_new)
+  |  B_X
+  |    B_addlo_x0 AT, L->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addi_x0 AT1, sp, SAVE_PC
+  |    B_st_x1 AT, BASE
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    B_st_x1 AT1, PC
+  |  B_X
+  |    B_addlo_x0 AT1, L->base
+  |    //call_intern lj_str_new		// (lua_State *L, char *str, size_t l)
+  |    B_jalr_x1 CFUNCADDR
+  |  B_X
+  |    B_move_x0 CARG1, CRET1
+  |    B_ld_x1 BASE, AT1
+  |  B_X
+  |    B_addi_x0 CARG3, zero, LJ_TSTR
+  |    B_b_x1 ->fff_restv
   |
   |.ffunc string_sub
   |  ffgccheck
-  |  addli AT, NARGS8:RC, -16
-  |   addi CARG3, BASE, 16+HI
-  |   ld4s CARG3, CARG3
-  |    addi AT2, BASE, 16
-  |    ld AT2, AT2
-  |   addi CROSSTMP4, BASE, HI
-  |   ld4s CROSSTMP4, CROSSTMP4
-  |    addi STR:CARG1, BASE, LO
-  |    ld4s STR:CARG1, STR:CARG1
-  |  bltz AT, ->fff_fallback
-  |   addi CARG2, BASE, 8+HI
-  |   ld4s CARG2, CARG2
-  |    addi AT3, BASE, 8
-  |    ld AT3, AT3
-  |  addi CARG4, zero, -1
+  |  B_X
+  |    B_addli_x0 AT, NARGS8:RC, -16
+  |    B_addi_x1 CARG3, BASE, 16+HI
+  |  B_X
+  |    B_addi_x0 AT2, BASE, 16
+  |    B_ld4s_x1 CARG3, CARG3
+  |  B_X
+  |    B_addi_x0 TMP0, BASE, HI
+  |    B_ld_x1 AT2, AT2
+  |  ld4s TMP0, TMP0
+  |  ld4s STR:CARG1, BASE
+  |  B_X
+  |    B_addi_x0 CARG2, BASE, 8+HI
+  |    B_bltz_x1 AT, ->fff_fallback
+  |  B_X
+  |    B_addi_x0 AT3, BASE, 8
+  |    B_ld4s_x1 CARG2, CARG2
+  |  B_X
+  |    B_addi_x0 CARG4, zero, -1
+  |    B_ld_x1 AT3, AT3
   |  beqz AT, >1
   |   //cvt.w.d f0, f0
-  |  move CROSSTMP1, CARG1
-  |  move CROSSTMP2, CARG2
-  |  move CROSSTMP3, CARG3
-  |  move CROSSTMP5, AT3
-  |  move CROSSTMP6, RB
-  |  move CROSSTMP7, RC
-  |  move CARG1, AT2
-  |  load_got __fixdfsi
-  |  call_extern
-  |  move CARG4, CRET1
-  |  move CARG1, CROSSTMP1
-  |  move CARG2, CROSSTMP2
-  |  move CARG3, CROSSTMP3
-  |  move AT3, CROSSTMP5
-  |  move RB, CROSSTMP6
-  |  move RC, CROSSTMP7
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu AT, CARG3, AT
+  |  fixdfsi_inline AT2, TMP1, AT4, AT5, AT6
+  |  B_X
+  |    B_move_x0 CARG4, AT2
+  |    B_moveli_x1 TMP1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  shl16insli TMP1, TMP1, (short)(LJ_TISNUM & 0xFFFF)
+  |  cmpltu AT, CARG3, TMP1
   |  beqz AT, ->fff_fallback
   |1:
-  |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu AT1, CARG2, AT1
+  |  cmpltu AT1, CARG2, TMP1
   |  beqz AT1, ->fff_fallback
   |  //cvt.w.d f2, f2
-  |  move CROSSTMP1, CARG1
-  |  move CROSSTMP2, CARG4
-  |  move CROSSTMP6, RB
-  |  move CROSSTMP7, RC
-  |  move CARG1, AT3
-  |  load_got __fixdfsi
-  |  call_extern
-  |  move CARG3, CRET1
-  |  move CARG1, CROSSTMP1
-  |  move CARG4, CROSSTMP2
-  |  move RB, CROSSTMP6
-  |  move RC, CROSSTMP7
-  |  addlo CARG2, STR:CARG1->len
-  |  ld4u CARG2, CARG2
-  |  addi AT, zero, LJ_TSTR
-  |  cmpne AT, CROSSTMP4, AT
+  |  fixdfsi_inline AT3, AT2, AT4, AT5, AT6
+  |  B_X
+  |    B_move_x0 CARG3, AT3
+  |    B_addlo_x1 CARG2, STR:CARG1->len
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TSTR
+  |    B_ld4u_x1 CARG2, CARG2
+  |  cmpne AT, TMP0, AT
   |  bnez AT, ->fff_fallback
   |  // STR:CARG1 = str, CARG2 = str->len, CARG3 = start, CARG4 = end
-  |  cmplts AT, CARG4, zero
-  |  addli CROSSTMP4, CARG2, 1
-  |  add TMP1, CARG4, CROSSTMP4
-  |   cmplts TMP3, CARG3, zero
-  |  cmovnez CARG4, AT, TMP1
-  |   add TMP1, CARG3, CROSSTMP4
-  |   cmovnez CARG3, TMP3, TMP1
-  |   addi TMP2, zero, 1
-  |  cmplts AT, CARG4, zero
-  |   cmplts TMP3, zero, CARG3
+  |  B_X
+  |    B_cmplts_x0 AT, CARG4, zero
+  |    B_addli_x1 TMP0, CARG2, 1
+  |  B_X
+  |    B_add_x0 TMP1, CARG4, TMP0
+  |    B_cmplts_x1 TMP3, CARG3, zero
+  |  B_X
+  |    B_cmovnez_x0 CARG4, AT, TMP1
+  |    B_add_x1 TMP1, CARG3, TMP0
+  |  B_X
+  |    B_cmovnez_x0 CARG3, TMP3, TMP1
+  |    B_addi_x1 TMP2, zero, 1
+  |  B_X
+  |    B_cmplts_x0 AT, CARG4, zero
+  |    B_cmplts_x1 TMP3, zero, CARG3
   |  cmovnez CARG4, AT, zero
-  |   cmoveqz CARG3, TMP3, TMP2		// if (start < 1) start = 1
-  |  cmplts AT, CARG2, CARG4
-  |  cmovnez CARG4, AT, CARG2
-  |   add CARG2, STR:CARG1, CARG3
-  |  sub CARG3, CARG4, CARG3		// len = end - start
-  |   addli CARG2, CARG2, sizeof(GCstr)-1
+  |  B_X
+  |    B_cmoveqz_x0 CARG3, TMP3, TMP2		// if (start < 1) start = 1
+  |    B_cmplts_x1 AT, CARG2, CARG4
+  |  B_X
+  |    B_cmovnez_x0 CARG4, AT, CARG2
+  |    B_add_x1 CARG2, STR:CARG1, CARG3
+  |  B_X
+  |    B_sub_x0 CARG3, CARG4, CARG3		// len = end - start
+  |    B_addli_x1 CARG2, CARG2, sizeof(GCstr)-1
   |  addli CARG3, CARG3, 1		// len++
   |  bgez CARG3, ->fff_newstr
   |->fff_emptystr:  // Return empty string.
-  |  addli STR:CARG1, DISPATCH, DISPATCH_GL(strempty)
-  |  addi CARG3, zero, LJ_TSTR
+  |  B_X
+  |    B_addli_x0 STR:CARG1, DISPATCH, DISPATCH_GL(strempty)
+  |    B_addi_x1 CARG3, zero, LJ_TSTR
   |  b ->fff_restv
   |
   |.ffunc string_rep			// Only handle the 1-char case inline.
   |  ffgccheck
-  |  addi TMP0, BASE, HI
-  |  ld4s TMP0, TMP0
-  |   addli AT, NARGS8:RC, -16		// Exactly 2 arguments.
-  |  addi CARG4, BASE, 8+HI
-  |  ld4s CARG4, CARG4
-  |   addi STR:CARG1, BASE, LO
-  |   ld4s STR:CARG1, STR:CARG1
-  |  addli TMP0, TMP0, -LJ_TSTR
-  |   addi AT2, BASE, 8
-  |   ld AT2, AT2
-  |  or AT, AT, TMP0
-  |  moveli CROSSTMP2, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |  B_X
+  |    B_addi_x0 TMP0, BASE, HI
+  |    B_addi_x1 CARG4, BASE, 8+HI
+  |  B_X
+  |    B_addli_x0 AT, NARGS8:RC, -16		// Exactly 2 arguments.
+  |    B_ld4s_x1 TMP0, TMP0
+  |  B_X
+  |    B_addi_x0 STR:CARG1, BASE, LO
+  |    B_ld4s_x1 CARG4, CARG4
+  |  B_X
+  |    B_addli_x0 TMP0, TMP0, -LJ_TSTR
+  |    B_ld4s_x1 STR:CARG1, STR:CARG1
+  |  B_X
+  |    B_addi_x0 AT2, BASE, 8
+  |    B_or_x1 AT, AT, TMP0
+  |  B_X
+  |    B_moveli_x0 CROSSTMP2, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_ld_x1 AT2, AT2
   |  shl16insli CROSSTMP2, CROSSTMP2, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu CROSSTMP2, CARG4, CROSSTMP2
-  |  bnez AT, ->fff_fallback
-  |   //cvt.w.d f0, f0
-  |  move CROSSTMP1, CARG1
-  |  move CROSSTMP6, RB
-  |  move CROSSTMP7, RC
-  |  move CARG1, AT2
-  |  load_got __fixdfsi
-  |  call_extern
-  |  move CARG3, CRET1
-  |  move CARG1, CROSSTMP1
-  |  move RB, CROSSTMP6
-  |  move RC, CROSSTMP7
-  |  addlo TMP0, STR:CARG1->len
+  |  B_X
+  |    B_cmpltu_x0 CROSSTMP2, CARG4, CROSSTMP2
+  |    B_bnez_x1 AT, ->fff_fallback
+  |  //cvt.w.d f0, f0
+  |  fixdfsi_inline AT2, AT3, AT4, AT5, AT6
+  |  B_X
+  |    B_move_x0 CARG3, AT2
+  |    B_addlo_x1 TMP0, STR:CARG1->len
   |  ld4u TMP0, TMP0
-  |  beqz CROSSTMP2, ->fff_fallback
-  |  addli TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
-  |  ld4u TMP1, TMP1
-  |  addi AT, zero, 1
-  |   cmpltu AT, AT, TMP0
-  |   blez CARG3, ->fff_emptystr	// Count <= 0?
+  |  B_X
+  |    B_addli_x0 TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
+  |    B_beqz_x1 CROSSTMP2, ->fff_fallback
+  |  B_X
+  |    B_addi_x0 AT, zero, 1
+  |    B_ld4u_x1 TMP1, TMP1
+  |  B_X
+  |    B_cmpltu_x0 AT, AT, TMP0
+  |    B_blez_x1 CARG3, ->fff_emptystr	// Count <= 0?
   |  cmpltu TMP0, TMP1, CARG3
-  |  beqz TMP0, ->fff_emptystr		// Zero length string?
-  |  or AT, AT, TMP0
-  |   addli CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
-  |   ld CARG2, CARG2
-  |  addlo TMP0, STR:CARG1[1]
+  |  B_X
+  |    B_or_x0 AT, AT, TMP0
+  |    B_beqz_x1 TMP0, ->fff_emptystr		// Zero length string?
+  |  addli CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
+  |  B_X
+  |    B_addlo_x0 TMP0, STR:CARG1[1]
+  |    B_ld_x1 CARG2, CARG2
   |  ld1u TMP0, TMP0
-  |  bnez AT, ->fff_fallback		// Fallback for > 1-char strings.
-  |  add TMP2, CARG2, CARG3
+  |  B_X
+  |    B_add_x0 TMP2, CARG2, CARG3
+  |    B_bnez_x1 AT, ->fff_fallback		// Fallback for > 1-char strings.
   |1:  // Fill buffer with char. Yes, this is suboptimal code (do you care?).
-  |  addli TMP2, TMP2, -1
-  |  cmpltu AT, CARG2, TMP2
+  |  B_X
+  |    B_addli_x0 TMP2, TMP2, -1
+  |    B_cmpltu_x1 AT, CARG2, TMP2
   |  st1 TMP2, TMP0
   |  bnez AT, <1
   |  b ->fff_newstr
@@ -3088,29 +3137,39 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc string_reverse
   |  ffgccheck
   |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |   addi STR:CARG1, BASE, LO
-  |   ld4s STR:CARG1, STR:CARG1
-  |  addi AT, zero, LJ_TSTR
-  |  beqz NARGS8:RC, ->fff_fallback
-  |  addli TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
-  |  ld4u TMP1, TMP1
-  |  cmpne AT, CARG3, AT
-  |  bnez AT, ->fff_fallback
-  |  addlo CARG3, STR:CARG1->len
-  |  ld4u CARG3, CARG3
-  |   addli CARG1, STR:CARG1, #STR
-  |   addli CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
-  |   ld CARG2, CARG2
-  |  cmpltu AT, TMP1, CARG3
-  |  add TMP3, CARG1, CARG3
-  |  bnez AT, ->fff_fallback
+  |  B_X
+  |    B_addi_x0 STR:CARG1, BASE, LO
+  |    B_ld4s_x1 CARG3, CARG3
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TSTR
+  |    B_ld4s_x1 STR:CARG1, STR:CARG1
+  |  B_X
+  |    B_addli_x0 TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
+  |    B_beqz_x1 NARGS8:RC, ->fff_fallback
+  |  B_X
+  |    B_cmpne_x0 AT, CARG3, AT
+  |    B_ld4u_x1 TMP1, TMP1
+  |  B_X
+  |    B_addlo_x0 CARG3, STR:CARG1->len
+  |    B_bnez_x1 AT, ->fff_fallback
+  |  B_X
+  |    B_addli_x0 CARG1, STR:CARG1, #STR
+  |    B_ld4u_x1 CARG3, CARG3
+  |  addli CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
+  |  B_X
+  |    B_cmpltu_x0 AT, TMP1, CARG3
+  |    B_ld_x1 CARG2, CARG2
+  |  B_X
+  |    B_add_x0 TMP3, CARG1, CARG3
+  |    B_bnez_x1 AT, ->fff_fallback
   |  add CARG4, CARG2, CARG3
   |1:  // Reverse string copy.
-  |   ld1u TMP1, CARG1
-  |  cmpltu AT, CARG1, TMP3
-  |  addli CARG1, CARG1, 1
-  |  beqz AT, ->fff_newstr
+  |  B_X
+  |    B_cmpltu_x0 AT, CARG1, TMP3
+  |    B_ld1u_x1 TMP1, CARG1
+  |  B_X
+  |    B_addli_x0 CARG1, CARG1, 1
+  |    B_beqz_x1 AT, ->fff_newstr
   |  addli CARG4, CARG4, -1
   |  st1 CARG4, TMP1
   |  b <1
@@ -3119,36 +3178,49 @@ static void build_subroutines(BuildCtx *ctx)
   |  .ffunc name
   |  ffgccheck
   |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |   addi STR:CARG1, BASE, LO
-  |   ld4s STR:CARG1, STR:CARG1
-  |  addi AT, zero, LJ_TSTR
-  |  beqz NARGS8:RC, ->fff_fallback
-  |  addli TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
-  |  ld4u TMP1, TMP1
-  |  cmpne AT, CARG3, AT
-  |  bnez AT, ->fff_fallback
-  |  addlo CARG3, STR:CARG1->len
-  |  ld4u CARG3, CARG3
-  |   addli CARG1, STR:CARG1, #STR
-  |   addli CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
-  |   ld CARG2, CARG2
-  |  cmpltu AT, TMP1, CARG3
-  |  add TMP3, CARG1, CARG3
-  |  bnez AT, ->fff_fallback
+  |  B_X
+  |    B_addi_x0 STR:CARG1, BASE, LO
+  |    B_ld4s_x1 CARG3, CARG3
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TSTR
+  |    B_ld4s_x1 STR:CARG1, STR:CARG1
+  |  B_X
+  |    B_addli_x0 TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
+  |    B_beqz_x1 NARGS8:RC, ->fff_fallback
+  |  B_X
+  |    B_cmpne_x0 AT, CARG3, AT
+  |    B_ld4u_x1 TMP1, TMP1
+  |  B_X
+  |    B_addlo_x0 CARG3, STR:CARG1->len
+  |    B_bnez_x1 AT, ->fff_fallback
+  |  B_X
+  |    B_addli_x0 CARG1, STR:CARG1, #STR
+  |    B_ld4u_x1 CARG3, CARG3
+  |  addli CARG2, DISPATCH, DISPATCH_GL(tmpbuf.buf)
+  |  B_X
+  |    B_cmpltu_x0 AT, TMP1, CARG3
+  |    B_ld_x1 CARG2, CARG2
+  |  B_X
+  |    B_add_x0 TMP3, CARG1, CARG3
+  |    B_bnez_x1 AT, ->fff_fallback
   |  move CARG4, CARG2
   |1:  // ASCII case conversion.
-  |   ld1u TMP1, CARG1
-  |  cmpltu AT, CARG1, TMP3
-  |  addli TMP0, TMP1, -lo
-  |  beqz AT, ->fff_newstr
-  |   xori TMP2, TMP1, 0x20
-  |   cmpltui AT, TMP0, 26
-  |   cmovnez TMP1, AT, TMP2
-  |  addli CARG1, CARG1, 1
-  |   st1 CARG4, TMP1
-  |  addli CARG4, CARG4, 1
-  |  b <1
+  |  B_X
+  |    B_cmpltu_x0 AT, CARG1, TMP3
+  |    B_ld1u_x1 TMP1, CARG1
+  |  B_X
+  |    B_addli_x0 TMP0, TMP1, -lo
+  |    B_beqz_x1 AT, ->fff_newstr
+  |  B_X
+  |    B_xori_x0 TMP2, TMP1, 0x20
+  |    B_cmpltui_x1 AT, TMP0, 26
+  |  B_X
+  |    B_cmovnez_x0 TMP1, AT, TMP2
+  |    B_addli_x1 CARG1, CARG1, 1
+  |  st1 CARG4, TMP1
+  |  B_X
+  |    B_addli_x0 CARG4, CARG4, 1
+  |    B_b_x1 <1
   |.endmacro
   |
   |ffstring_case string_lower, 65
