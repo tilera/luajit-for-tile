@@ -3937,28 +3937,39 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 
   case BC_ISLT: case BC_ISGE: case BC_ISLE: case BC_ISGT:
     |  // RA = src1*8, RD = src2*8, JMP with RD = target
-    |  add CARG2, BASE, RA
-    |   add CARG3, BASE, RD
-    |  addi TMP0, CARG2, HI
-    |  ld4s TMP0, TMP0
-    |   addi TMP1, CARG3, HI
-    |   ld4s TMP1, TMP1
-    |   ld AT2, CARG2
-    |   ld AT3, CARG3
-    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-    |  cmpltu TMP0, TMP0, AT
-    |   cmpltu TMP1, TMP1, AT
-    |    addi TMP2, PC, OFS_RD
-    |    ld2u TMP2, TMP2
-    |  and TMP0, TMP0, TMP1
-    |    addi PC, PC, 4
-    |   moveli TMP1, (-(BCBIAS_J*4 >> 16) & 65535)
-    |   shl16insli TMP1, TMP1, 0
-    |  beqz TMP0, ->vmeta_comp
-    |    decode_RD4b TMP2
-    |    add TMP2, TMP2, TMP1
-    |  fdouble_add_flags AT, AT2, AT3
+    |  B_X
+    |    B_add_x0 CARG2, BASE, RA
+    |    B_add_x1 CARG3, BASE, RD
+    |  B_X
+    |    B_addi_x0 TMP0, CARG2, HI
+    |    B_ld_x1 AT2, CARG2
+    |  B_X
+    |    B_addi_x0 TMP1, CARG3, HI
+    |    B_ld4s_x1 TMP0, TMP0
+    |  B_X
+    |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |    B_ld4s_x1 TMP1, TMP1
+    |  B_X
+    |    B_shl16insli_x0 AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |    B_ld_x1 AT3, CARG3
+    |  B_X
+    |    B_cmpltu_x0 TMP0, TMP0, AT
+    |    B_cmpltu_x1 TMP1, TMP1, AT
+    |  B_X
+    |    B_addi_x0 TMP2, PC, OFS_RD
+    |    B_moveli_x1 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |  B_X
+    |    B_and_x0 TMP0, TMP0, TMP1
+    |    B_ld2u_x1 TMP2, TMP2
+    |  B_X
+    |    B_addi_x0 PC, PC, 4
+    |    B_shl16insli_x1 TMP3, TMP3, 0
+    |  B_X
+    |    B_shli_x0 TMP2, TMP2, 2 
+    |    B_beqz_x1 TMP0, ->vmeta_comp
+    |  B_X
+    |    B_fdouble_add_flags_x0 AT, AT2, AT3
+    |    B_add_x1 TMP2, TMP2, TMP3
     if (op == BC_ISLT || op == BC_ISGE) {
       |  bfextu AT, AT, 26, 26
     } else {
@@ -3977,27 +3988,38 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_ISEQV: case BC_ISNEV:
     vk = op == BC_ISEQV;
     |  // RA = src1*8, RD = src2*8, JMP with RD = target
-    |  add RA, BASE, RA
-    |   addli PC, PC, 4
-    |  addi TMP0, RA, HI
-    |  ld4s TMP0, TMP0
-    |   ld AT2, RA
-    |  add RD, BASE, RD
-    |    addi TMP2, PC, -4+OFS_RD
-    |    ld2u TMP2, TMP2
-    |   addi TMP1, RD, HI
-    |   ld4s TMP1, TMP1
-    |   ld AT3, RD
-    |    moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
-    |    shl16insli TMP3, TMP3, 0
-    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_addli_x1 PC, PC, 4
+    |  B_X
+    |    B_addi_x0 TMP0, RA, HI
+    |    B_ld_x1 AT2, RA
+    |  B_X
+    |    B_add_x0 RD, BASE, RD
+    |    B_ld4s_x1 TMP0, TMP0
+    |  B_X
+    |    B_addi_x0 TMP2, PC, -4+OFS_RD
+    |    B_moveli_x1 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |  B_X
+    |    B_addi_x0 TMP1, RD, HI
+    |    B_ld2u_x1 TMP2, TMP2
+    |  B_X
+    |    B_shl16insli_x0 TMP3, TMP3, 0
+    |    B_ld4s_x1 TMP1, TMP1
+    |  B_X
+    |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |    B_ld_x1 AT3, RD
     |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-    |  cmpltu AT1, TMP0, AT
-    |  cmpltu CARG1, TMP1, AT
-    |    decode_RD4b TMP2
-    |  and AT, AT1, CARG1
-    |   add TMP2, TMP2, TMP3
-    |  beqz AT, >5
+    |  B_X
+    |    B_cmpltu_x0 AT1, TMP0, AT
+    |    B_cmpltu_x1 CARG1, TMP1, AT
+    |  B_X
+    |    //decode_RD4b
+    |    B_shli_x0 TMP2, TMP2, 2
+    |    B_and_x1 AT, AT1, CARG1
+    |  B_X
+    |    B_add_x0 TMP2, TMP2, TMP3
+    |    B_beqz_x1 AT, >5
     |  fdouble_add_flags AT, AT2, AT3
     |  bfextu AT, AT, 30, 30
     if (vk) {
@@ -4010,8 +4032,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next
     |5:  // Either or both types are not numbers.
     |  addi CARG2, RA, LO
-    |  ld4s CARG2, CARG2
-    |  addi CARG3, RD, LO
+    |  B_X
+    |    B_addi_x0 CARG3, RD, LO
+    |    B_ld4s_x1 CARG2, CARG2
     |  ld4s CARG3, CARG3
     |.if FFI
     |  addi TMP3, zero, LJ_TCDATA
@@ -4023,59 +4046,79 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpeq AT1, TMP1, TMP3
     |  bnez AT1, ->vmeta_equal_cd
     |.endif
-    |  xor TMP3, CARG2, CARG3			// Same tv?
-    |  xor TMP1, TMP1, TMP0			// Same type?
-    |  cmpltui CARG1, TMP0, LJ_TISTABUD+1		// Table or userdata?
-    |  cmoveqz TMP3, AT, zero			// Ignore tv if primitive.
-    |  cmovnez CARG1, TMP1, zero			// Tab/ud and same type?
-    |  or AT, TMP1, TMP3			// Same type && (pri||same tv).
+    |  B_X
+    |    B_xor_x0 TMP3, CARG2, CARG3			// Same tv?
+    |    B_xor_x1 TMP1, TMP1, TMP0			// Same type?
+    |  B_X
+    |    B_cmoveqz_x0 TMP3, AT, zero			// Ignore tv if primitive.
+    |    B_cmpltui_x1 CARG1, TMP0, LJ_TISTABUD+1		// Table or userdata?
+    |  B_X
+    |    B_cmovnez_x0 CARG1, TMP1, zero			// Tab/ud and same type?
+    |    B_or_x1 AT, TMP1, TMP3			// Same type && (pri||same tv).
     |  cmoveqz CARG1, AT, zero
     if (vk) {
-      |  cmovnez TMP2, AT, zero
+      |  B_X
+      |    B_cmovnez_x0 TMP2, AT, zero
+      |    B_beqz_x1 CARG1, <1	// Done if not tab/ud or not same type or same tv.
     } else {
-      |  cmoveqz TMP2, AT, zero
+      |  B_X
+      |    B_cmoveqz_x0 TMP2, AT, zero
+      |    B_beqz_x1 CARG1, <1	// Done if not tab/ud or not same type or same tv.
     }
-    |  beqz CARG1, <1	// Done if not tab/ud or not same type or same tv.
     |  // Different tables or userdatas. Need to check __eq metamethod.
     |  // Field metatable must be at same offset for GCtab and GCudata!
     |  addlo TAB:TMP1, TAB:CARG2->metatable
     |  ld4u TAB:TMP1, TAB:TMP1
-    |  beqz TAB:TMP1, <1		// No metatable?
-    |  addlo TMP1, TAB:TMP1->nomm
-    |  ld1u TMP1, TMP1
-    |  andi TMP1, TMP1, 1<<MM_eq
-    |  bnez TMP1, <1			// Or 'no __eq' flag set?
-    |  addi CARG4, zero, 1-vk			// ne = 0 or 1.
+    |  B_X
+    |    B_addlo_x0 AT1, TAB:TMP1->nomm
+    |    B_beqz_x1 TAB:TMP1, <1		// No metatable?
+    |  ld1u TMP1, AT1
+    |  andi AT1, TMP1, 1<<MM_eq
+    |  B_X
+    |    B_addi_x0 CARG4, zero, 1-vk			// ne = 0 or 1.
+    |    B_bnez_x1 AT1, <1			// Or 'no __eq' flag set?
     |  b ->vmeta_equal			// Handle __eq metamethod.
     break;
 
   case BC_ISEQS: case BC_ISNES:
     vk = op == BC_ISEQS;
     |  // RA = src*8, RD = str_const*8 (~), JMP with RD = target
-    |  add RA, BASE, RA
-    |   addli PC, PC, 4
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_addli_x1 PC, PC, 4
     |  addi TMP0, RA, HI
-    |  ld4s TMP0, TMP0
-    |   shrui RD, RD, 1
-    |  addi STR:TMP3, RA, LO
-    |  ld4u STR:TMP3, STR:TMP3
-    |   sub RD, KBASE, RD
-    |    addi TMP2, PC, -4+OFS_RD
-    |    ld2u TMP2, TMP2
+    |  B_X
+    |    B_shrui_x0 RD, RD, 1
+    |    B_ld4s_x1 TMP0, TMP0
+    |  B_X
+    |    B_sub_x0 RD, KBASE, RD
+    |    B_ld4u_x1 STR:TMP3, RA
+    |  addi TMP2, PC, -4+OFS_RD
     |.if FFI
-    |  addi AT, zero, LJ_TCDATA
+    |  B_X
+    |    B_addi_x0 AT, zero, LJ_TCDATA
+    |    B_ld2u_x1 TMP2, TMP2
     |  cmpeq AT, TMP0, AT
-    |  bnez AT, ->vmeta_equal_cd
+    |  B_X
+    |    B_addi_x0 STR:TMP1, RD, -4
+    |    B_bnez_x1 AT, ->vmeta_equal_cd
+    |.else
+    |  B_X
+    |    B_addi_x0 STR:TMP1, RD, -4
+    |    B_ld2u_x1 TMP2, TMP2
     |.endif
-    |  addi STR:TMP1, RD, -4
-    |  ld4u STR:TMP1, STR:TMP1
-    |  addli TMP0, TMP0, -LJ_TSTR
-    |   decode_RD4b TMP2
-    |  xor TMP1, STR:TMP1, STR:TMP3
-    |  or TMP0, TMP0, TMP1
-    |   moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
-    |   shl16insli TMP3, TMP3, 0
-    |   add TMP2, TMP2, TMP3
+    |  B_X
+    |    B_addli_x0 TMP0, TMP0, -LJ_TSTR
+    |    B_ld4u_x1 STR:TMP1, STR:TMP1
+    |  B_X
+    |    //decode_RD4b TMP2
+    |    B_shli_x0 TMP2, TMP2, 2
+    |    B_xor_x1 TMP1, STR:TMP1, STR:TMP3
+    |  B_X
+    |    B_or_x0 TMP0, TMP0, TMP1
+    |    B_moveli_x1 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |  shl16insli TMP3, TMP3, 0
+    |  add TMP2, TMP2, TMP3
     if (vk) {
       |  cmovnez TMP2, TMP0, zero
     } else {
@@ -4088,26 +4131,36 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_ISEQN: case BC_ISNEN:
     vk = op == BC_ISEQN;
     |  // RA = src*8, RD = num_const*8, JMP with RD = target
-    |  add RA, BASE, RA
-    |   addli PC, PC, 4
-    |  addi TMP0, RA, HI
-    |  ld4s TMP0, TMP0
-    |   ld AT2, RA
-    |  add RD, KBASE, RD
-    |    addi TMP2, PC, -4+OFS_RD
-    |    ld2u TMP2, TMP2
-    |   ld AT3, RD
-    |    moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
-    |    shl16insli TMP3, TMP3, 0
-    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-    |  cmpltu AT, TMP0, AT
-    |    decode_RD4b TMP2
-    |   add TMP2, TMP2, TMP3
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_addli_x1 PC, PC, 4
+    |  B_X
+    |    B_addi_x0 TMP0, RA, HI
+    |    B_moveli_x1 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |  B_X
+    |    B_shl16insli_x0 TMP3, TMP3, 0
+    |    B_ld4s_x1 TMP0, TMP0
+    |  B_X
+    |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |    B_ld_x1 AT2, RA
+    |  B_X
+    |    B_add_x0 RD, KBASE, RD
+    |    B_addi_x1 TMP2, PC, -4+OFS_RD
+    |  B_X
+    |    B_shl16insli_x0 AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |    B_ld2u_x1 TMP2, TMP2
+    |  B_X
+    |    B_cmpltu_x0 AT, TMP0, AT
+    |    B_ld_x1 AT3, RD
+    |  decode_RD4b TMP2
     |.if FFI
-    |  beqz AT, >5
+    |  B_X
+    |    B_add_x0 TMP2, TMP2, TMP3
+    |    B_beqz_x1 AT, >5
     |.else
-    |  beqz AT, >1
+    |  B_X
+    |    B_add_x0 TMP2, TMP2, TMP3
+    |    B_beqz_x1 AT, >1
     |.endif
     |  fdouble_add_flags AT, AT2, AT3
     |  bfextu AT, AT, 30, 30
@@ -4123,8 +4176,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next
     |.if FFI
     |5:
-    |  addi AT, zero, LJ_TCDATA
-    |  cmpeq AT, TMP0, AT
+    |  cmpeqi AT, TMP0, -11 // LJ_TCDATA
     |  bnez AT, ->vmeta_equal_cd
     |  b <1
     |.endif
@@ -4133,21 +4185,26 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_ISEQP: case BC_ISNEP:
     vk = op == BC_ISEQP;
     |  // RA = src*8, RD = primitive_type*8 (~), JMP with RD = target
-    |  add RA, BASE, RA
-    |   shrui TMP1, RD, 3
-    |  addi TMP0, RA, HI
-    |  ld4s TMP0, TMP0
-    |    addi TMP2, PC, OFS_RD
-    |    ld2u TMP2, TMP2
-    |   nor TMP1, TMP1, zero
-    |    addli PC, PC, 4
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_shrui_x1 TMP1, RD, 3
+    |  B_X
+    |    B_addi_x0 TMP0, RA, HI
+    |    B_addli_x1 PC, PC, 4
+    |  B_X
+    |    B_addi_x0 TMP2, PC, OFS_RD
+    |    B_ld4s_x1 TMP0, TMP0
+    |  B_X
+    |    B_nor_x0 TMP1, TMP1, zero
+    |    B_ld2u_x1 TMP2, TMP2
     |.if FFI
-    |  addi AT, zero, LJ_TCDATA
-    |  cmpeq AT, TMP0, AT
+    |  cmpeqi AT, TMP0, -11 // LJ_TCDATA
     |  bnez AT, ->vmeta_equal_cd
     |.endif
-    |  xor TMP0, TMP0, TMP1
-    |  decode_RD4b TMP2
+    |  B_X
+    |    B_xor_x0 TMP0, TMP0, TMP1
+    |    //decode_RD4b TMP2
+    |    B_shli_x1 TMP2, TMP2, 2
     |  moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
     |  shl16insli TMP3, TMP3, 0
     |  add TMP2, TMP2, TMP3
