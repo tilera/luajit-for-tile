@@ -42,22 +42,23 @@
 |.define TISNIL,	r52
 |
 |// The following temporaries are not saved across C calls, except for RA.
-|.define RB,		r15
-|.define RC,		r16
-|.define RD,		r17
-|.define INS,		r18
+|.define RB,		r14
+|.define RC,		r15
+|.define RD,		r16
+|.define INS,		r17
 |
-|.define TMP0,		r19
-|.define TMP1,		r20
-|.define TMP2,		r21
-|.define TMP3,		r22
+|.define TMP0,		r18
+|.define TMP1,		r19
+|.define TMP2,		r20
+|.define TMP3,		r21
 |
-|.define AT,		r23
-|.define AT1,		r24
-|.define AT2,		r25 // For softfloat
-|.define AT3,		r26 // For softfloat
-|.define AT4,		r27 // For softfloat
-|.define AT5,		r28 // For softfloat
+|.define AT,		r22
+|.define AT1,		r23
+|.define AT2,		r24 // For softfloat
+|.define AT3,		r25 // For softfloat
+|.define AT4,		r26 // For softfloat
+|.define AT5,		r27 // For softfloat
+|.define AT6,		r28 // For softfloat
 
 |// Calling conventions.
 |// TileGX PIC don't require function address pre-loaded into a specific
@@ -100,6 +101,12 @@
 |    B_sub_x1 a, b, c
 |.endmacro
 |
+|.macro subx, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_subx_x1 a, b, c
+|.endmacro
+|
 |.macro move, a, b
 |  B_X
 |    B_fnop_x0
@@ -140,6 +147,12 @@
 |  B_X
 |    B_fnop_x0
 |    B_addi_x1 a, b, c
+|.endmacro
+|
+|.macro addxi, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_addxi_x1 a, b, c
 |.endmacro
 |
 |.macro and, a, b, c
@@ -206,6 +219,12 @@
 |  B_X
 |    B_fnop_x0
 |    B_shrui_x1 a, b, c
+|.endmacro
+|
+|.macro shruxi, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_shruxi_x1 a, b, c
 |.endmacro
 |
 |.macro shrs, a, b, c
@@ -340,6 +359,12 @@
 |    B_jr_x1 a
 |.endmacro
 |
+|.macro jrp, a
+|  B_X
+|    B_fnop_x0
+|    B_jrp_x1 a
+|.endmacro
+|
 |.macro jal, a
 |  B_X
 |    B_fnop_x0
@@ -364,10 +389,22 @@
 |    B_beqz_x1 a, b
 |.endmacro
 |
+|.macro beqzt, a, b
+|  B_X
+|    B_fnop_x0
+|    B_beqzt_x1 a, b
+|.endmacro
+|
 |.macro bnez, a, b
 |  B_X
 |    B_fnop_x0
 |    B_bnez_x1 a, b
+|.endmacro
+|
+|.macro bnezt, a, b
+|  B_X
+|    B_fnop_x0
+|    B_bnezt_x1 a, b
 |.endmacro
 |
 |.macro bltz, a, b
@@ -781,6 +818,54 @@
 |  b target
 |.endmacro
 |
+|.macro fixdfsi_inline, R0, R1, R2, R3, R4
+|  B_X
+|    B_bfextu_x0 R1, R0, 52, 62
+|    B_moveli_x1 R4, 1054
+|  B_X
+|    B_cmples_x0 R3, R1, R4
+|    B_shrui_x1 R2, R0, 63
+|  B_X
+|    B_bfextu_x0 R4, R0, 0, 51
+|    B_bnezt_x1 R3, >3
+|  B_X
+|    B_moveli_x0 R0, 2047
+|    B_cmpne_x1 R4, R4, zero
+|  cmpeq R1, R1, R0
+|  and R1, R1, R4
+|  beqzt R1, >4
+|1:
+|  moveli R0, 32767
+|  shl16insli R0, R0, -1
+|2:
+|  b >5
+|3:
+|  moveli R0, 1022
+|  B_X
+|    B_cmples_x0 R3, R1, R0
+|    B_movei_x1 R0, 0
+|  bnez R3, <2
+|  B_X
+|    B_movei_x0 R0, 1
+|    B_moveli_x1 R3, 1075
+|  B_X
+|    B_shli_x0 R0, R0, 52
+|    B_subx_x1 R1, R3, R1
+|  or R0, R4, R0
+|  shru R0, R0, R1
+|  addxi R0, R0, 0
+|  subx R1, zero, R0
+|  cmovnez R0, R2, R1
+|  shruxi R1, R0, 31
+|  cmpeq R1, R1, R2
+|  bnez R1, <2
+|4:
+|  movei R0, -1
+|  B_X
+|    B_shli_x0 R0, R0, 31
+|    B_beqz_x1 R2, <1
+|5:
+|.endmacro
 |//-----------------------------------------------------------------------
 
 /* Generate subroutines used by opcodes and other parts of the VM. */
@@ -2256,100 +2341,108 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld4s PC, PC
   |  beqz AT, ->fff_fallback
   |   //cvt.w.d FRET1, FARG2
-  |  move CROSSTMP1, CARG1
-  |  move CROSSTMP2, CARG2
-  |  move CROSSTMP3, CARG3
-  |  move CROSSTMP4, CARG4
-  |  move CROSSTMP6, RB
-  |  move CROSSTMP7, RC
-  |  move CARG1, CARG2
-  |  load_got __fixdfsi
-  |  call_extern
-  |  move TMP2, CRET1
-  |  move CARG1, CROSSTMP1
-  |  move CARG2, CROSSTMP2
-  |  move CARG3, CROSSTMP3
-  |  move CARG4, CROSSTMP4
-  |  move RB, CROSSTMP6
-  |  move RC, CROSSTMP7
+  |  move AT2, CARG2
+  |  fixdfsi_inline AT2, AT3, AT4, AT5, AT6
+  |  move TMP2, AT2
   |  //cvt.d.w FARG1, FARG1
-  |  addi TMP3, zero, 1
-  |  cmpltsi AT, TMP3, 0
-  |  sub AT1, zero, TMP3
-  |  moveli AT2, 539
-  |  cmovnez TMP3, AT, AT1
-  |  shli AT2, AT2, 8
-  |  shli AT1, TMP3, 4
-  |  bfins AT2, AT, 20, 20
-  |  fdouble_pack1 TMP3, AT1, AT2
-  |  fdouble_pack2 TMP3, AT1, zero
-  |   addlo TMP0, TAB:CARG1->asize
-  |   ld4u TMP0, TMP0
-  |   addlo TMP1, TAB:CARG1->array
-  |   ld4u TMP1, TMP1
-  |   addli RA, BASE, -8
-  |  //add.d CARG2, CARG2, TMP3
-  |  fdouble_add_flags AT, CARG2, TMP3
+  |  moveli TMP3, 16368
+  |  shl16insli TMP3, TMP3, 0
+  |  B_X
+  |    B_shl16insli_x0 TMP3, TMP3, 0
+  |    B_addli_x1 RA, BASE, -8
+  |  B_X
+  |    B_shl16insli_x0 TMP3, TMP3, 0
+  |    B_addlo_x1 TMP0, TAB:CARG1->asize
+  |  B_X
+  |    B_addlo_x0 TMP1, TAB:CARG1->array
+  |    B_ld4u_x1 TMP0, TMP0
+  |  B_X
+  |    //add.d CARG2, CARG2, TMP3
+  |    B_fdouble_add_flags_x0 AT, CARG2, TMP3
+  |    B_ld4u_x1 TMP1, TMP1
   |  fdouble_unpack_min AT1, CARG2, TMP3
   |  fdouble_unpack_max TMP3, CARG2, TMP3
   |  fdouble_addsub TMP3, AT1, AT
   |  fdouble_pack1 CARG2, TMP3, AT
-  |  fdouble_pack2 CARG2, TMP3, zero
-  |  addli TMP2, TMP2, 1
-  |  cmpltu AT, TMP2, TMP0
-  |   shli TMP3, TMP2, 3
-  |   add TMP3, TMP1, TMP3
-  |  st RA, CARG2
+  |  B_X
+  |    B_fdouble_pack2_x0 CARG2, TMP3, zero
+  |    B_addli_x1 TMP2, TMP2, 1
+  |  B_X
+  |    B_cmpltu_x0 AT, TMP2, TMP0
+  |    B_shli_x1 TMP3, TMP2, 3
+  |  B_X
+  |    B_add_x0 TMP3, TMP1, TMP3
+  |    B_st_x1 RA, CARG2
   |  beqz AT, >2			// Not in array part?
-  |  addi TMP2, TMP3, HI
+  |  B_X
+  |    B_addi_x0 TMP2, TMP3, HI
+  |    B_ld_x1 AT2, TMP3
   |  ld4s TMP2, TMP2
-  |  ld AT2, TMP3
   |1:
-  |  addi RD, zero, (0+1)*8
-  |  cmpeq AT, TMP2, TISNIL
+  |  B_X
+  |    B_addi_x0 RD, zero, (0+1)*8
+  |    B_cmpeq_x1 AT, TMP2, TISNIL
   |  bnez AT, ->fff_res	// End of iteration, return 0 results.
-  |   addi RD, zero, (2+1)*8
-  |  addi AT, RA, 8
+  |  B_X
+  |    B_addi_x0 RD, zero, (2+1)*8
+  |    B_addi_x1 AT, RA, 8
   |  st AT, AT2
   |  b ->fff_res
   |2:  // Check for empty hash part first. Otherwise call C function.
   |  addlo TMP0, TAB:CARG1->hmask
-  |  ld4u TMP0, TMP0
-  |  load_got lj_tab_getinth
-  |  addi RD, zero, (0+1)*8
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_tab_getinth)
+  |    B_ld4u_x1 TMP0, TMP0
+  |  B_X
+  |    B_addi_x0 RD, zero, (0+1)*8
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
   |  beqz TMP0, ->fff_res
-  |  move CARG2, TMP2
-  |  call_intern lj_tab_getinth		// (GCtab *t, int32_t key)
+  |  B_X
+  |    B_move_x0 CARG2, TMP2
+  |    B_jalr_x1 CFUNCADDR // (GCtab *t, int32_t key)
   |  // Returns cTValue * or NULL.
-  |  addi RD, zero, (0+1)*8
-  |  beqz CRET1, ->fff_res
-  |  addi TMP2, CRET1, HI
+  |  B_X
+  |    B_addi_x0 RD, zero, (0+1)*8
+  |    B_beqz_x1 CRET1, ->fff_res
+  |  B_X
+  |    B_addi_x0 TMP2, CRET1, HI
+  |    B_ld_x1 AT2, CRET1
   |  ld4s TMP2, TMP2
-  |  ld AT2, CRET1
   |  b <1
   |
   |.ffunc_1 ipairs
-  |  addi AT, zero, LJ_TTAB
-  |  addi PC, BASE, FRAME_PC
-  |  ld4s PC, PC
-  |  cmpne AT, CARG3, AT
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TTAB
+  |    B_addi_x1 PC, BASE, FRAME_PC
+  |  B_X
+  |    B_cmpne_x0 AT, CARG3, AT
+  |    B_ld4s_x1 PC, PC
   |  bnez AT, ->fff_fallback
-  |  addli RA, BASE, -8
 #if LJ_52
-  |  addlo TAB:TMP2, TAB:CARG1->metatable
-  |  ld4u TAB:TMP2, TAB:TMP2
-  |   addlo AT2, CFUNC:RB->upvalue[0]
-  |   ld AT2, AT2
-  |  bnez TAB:TMP2, ->fff_fallback
-#else
-  |  addlo AT2, CFUNC:RB->upvalue[0]
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_addlo_x1 TAB:TMP2, TAB:CARG1->metatable
+  |  B_X
+  |    B_addlo_x0 AT2, CFUNC:RB->upvalue[0]
+  |    B_ld4u_x1 TAB:TMP2, TAB:TMP2
   |  ld AT2, AT2
+  |  B_X
+  |    B_addi_x0 AT, BASE, 8+HI
+  |    B_bnez_x1 TAB:TMP2, ->fff_fallback
+#else
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_addlo_x1 AT2, CFUNC:RB->upvalue[0]
+  |  B_X
+  |    B_addi_x0 AT, BASE, 8+HI
+  |    B_ld_x1 AT2, AT2
 #endif
-  |   addi AT, BASE, 8+HI
-  |   st4 AT, zero
-  |   addi AT, BASE, 8+LO
-  |   st4 AT, zero
-  |  addi RD, zero, (3+1)*8
+  |  B_X
+  |    B_addi_x0 AT1, BASE, 8+LO
+  |    B_st4_x1 AT, zero
+  |  B_X
+  |    B_addi_x0 RD, zero, (3+1)*8
+  |    B_st4_x1 AT1, zero
   |  st RA, AT2
   |  b ->fff_res
   |
