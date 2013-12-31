@@ -4364,46 +4364,64 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.macro ins_arithpre
     ||vk = ((int)op - BC_ADDVN) / (BC_ADDNV-BC_ADDVN);
     |  decode_RB8a RB, INS
-    |  decode_RB8b RB
-    |   decode_RDtoRC8 RC, RD
+    |  //decode_RB8b RB
+    |  bfextu RB, RB, 3, 10
+    |  B_X
+    |    //decode_RDtoRC8 RC, RD
+    |    B_bfextu_x0 RC, RD, 3, 10
+    |    B_shli_x1 RB, RB, 3
+    |  shli RC, RC, 3
     |  // RA = dst*8, RB = src1*8, RC = src2*8 | num_const*8
     ||switch (vk) {
     ||case 0:
-    |   add CARG3, BASE, RB
-    |    add CARG4, KBASE, RC
-    |   addi TMP1, CARG3, HI
-    |   ld4s TMP1, TMP1
-    |   ld AT2, CARG3
-    |   ld AT3, CARG4
-    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-    |   cmpltu AT, TMP1, AT
+    |  B_X
+    |    B_add_x0 CARG3, BASE, RB
+    |    B_add_x1 CARG4, KBASE, RC
+    |  B_X
+    |    B_addi_x0 TMP1, CARG3, HI
+    |    B_ld_x1 AT2, CARG3
+    |  B_X
+    |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |    B_ld4s_x1 TMP1, TMP1
+    |  B_X
+    |    B_shl16insli_x0 AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |    B_ld_x1 AT3, CARG4
+    |  cmpltu AT, TMP1, AT
     ||  break;
     ||case 1:
-    |   add CARG4, BASE, RB
-    |    add CARG3, KBASE, RC
-    |   addi TMP1, CARG4, HI
-    |   ld4s TMP1, TMP1
-    |   ld AT3, CARG4
-    |    ld AT2, CARG3
-    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-    |   cmpltu AT, TMP1, AT
+    |  B_X
+    |    B_add_x0 CARG4, BASE, RB
+    |    B_add_x1 CARG3, KBASE, RC
+    |  B_X
+    |    B_addi_x0 TMP1, CARG4, HI
+    |    B_ld_x1 AT3, CARG4
+    |  B_X
+    |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |    B_ld4s_x1 TMP1, TMP1
+    |  B_X
+    |    B_shl16insli_x0 AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |    B_ld_x1 AT2, CARG3
+    |  cmpltu AT, TMP1, AT
     ||  break;
     ||default:
-    |   add CARG3, BASE, RB
-    |    add CARG4, BASE, RC
-    |   addi TMP1, CARG3, HI
-    |   ld4s TMP1, TMP1
-    |    addi TMP2, CARG4, HI
-    |    ld4s TMP2, TMP2
-    |   ld AT2, CARG3
-    |    ld AT3, CARG4
-    |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-    |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
-    |   cmpltu AT, TMP1, AT1
-    |   cmpltu TMP0, TMP2, AT1
-    |   and AT, AT, TMP0
+    |  B_X
+    |    B_add_x0 CARG3, BASE, RB
+    |    B_add_x1 CARG4, BASE, RC
+    |  addi TMP1, CARG3, HI
+    |  B_X
+    |    B_addi_x0 TMP2, CARG4, HI
+    |    B_ld4s_x1 TMP1, TMP1
+    |  B_X
+    |    B_moveli_x0 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |    B_ld4s_x1 TMP2, TMP2
+    |  B_X
+    |    B_shl16insli_x0 AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
+    |    B_ld_x1 AT2, CARG3
+    |  B_X
+    |    B_cmpltu_x0 AT, TMP1, AT1
+    |    B_ld_x1 AT3, CARG4
+    |  cmpltu TMP0, TMP2, AT1
+    |  and AT, AT, TMP0
     ||  break;
     ||}
     |  add RA, BASE, RA
