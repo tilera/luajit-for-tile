@@ -4433,24 +4433,29 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mul_hu_lu AT3, AT, AT1
     |  mul_lu_lu AT4, AT, AT1
     |  mula_hu_lu AT3, AT1, AT
-    |  mul_hu_hu AT, AT, AT1
-    |  shli AT5, AT3, 32
-    |  shrui AT3, AT3, 32
-    |  add AT4, AT4, AT5
-    |  add AT3, AT, AT3
-    |  cmpltu AT5, AT4, AT5
+    |  B_X
+    |    B_mul_hu_hu_x0 AT, AT, AT1
+    |    B_shli_x1 AT5, AT3, 32
+    |  B_X
+    |    B_shrui_x0 AT3, AT3, 32
+    |    B_add_x1 AT4, AT4, AT5
+    |  B_X
+    |    B_add_x0 AT3, AT, AT3
+    |    B_cmpltu_x1 AT5, AT4, AT5
     |  add AT3, AT3, AT5
     |  fdouble_pack1 AT2, AT3, AT2
     |  fdouble_pack2 AT2, AT3, AT4
     |.elif "ins" == "div"
-    |  move CARG1, AT2
-    |  move CARG2, AT3
+    |  B_X
+    |    B_move_x0 CARG1, AT2
+    |    B_move_x1 CARG2, AT3
     |  load_got __divdf3
     |  call_extern
     |  move AT2, CRET1
     |.else
-    |  move CARG1, AT2
-    |  move CARG2, AT3
+    |  B_X
+    |    B_move_x0 CARG1, AT2
+    |    B_move_x1 CARG2, AT3
     |  load_got fmod
     |  call_extern
     |  move AT2, CRET1
@@ -4477,23 +4482,38 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     break;
   case BC_POW:
     |  decode_RB8a RB, INS
-    |  decode_RB8b RB
-    |   decode_RDtoRC8 RC, RD
-    |  add CARG3, BASE, RB
-    |   add CARG4, BASE, RC
-    |  addi TMP1, CARG3, HI
-    |  ld4s TMP1, TMP1
-    |   addi TMP2, CARG4, HI
-    |   ld4s TMP2, TMP2
-    |  ld CARG1, CARG3
-    |   ld CARG2, CARG4
-    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-    |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-    |  cmpltu AT1, TMP1, AT
-    |  cmpltu TMP0, TMP2, AT
-    |  and AT, AT1, TMP0
-    |  load_got pow
-    |  add RA, BASE, RA
+    |  //decode_RB8b RB
+    |  bfextu RB, RB, 3, 10
+    |  B_X
+    |    //decode_RDtoRC8 RC, RD
+    |    B_bfextu_x0 RC, RD, 3, 10
+    |    B_shli_x1 RB, RB, 3
+    |  B_X
+    |    B_shli_x0 RC, RC, 3
+    |    B_add_x1 CARG3, BASE, RB
+    |  B_X
+    |    B_add_x0 CARG4, BASE, RC
+    |    B_addi_x1 TMP1, CARG3, HI
+    |  B_X
+    |    B_addi_x0 TMP2, CARG4, HI
+    |    B_ld4s_x1 TMP1, TMP1
+    |  ld4s TMP2, TMP2
+    |  B_X
+    |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |    B_ld_x1 CARG1, CARG3
+    |  B_X
+    |    B_shl16insli_x0 AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+    |    B_ld_x1 CARG2, CARG4
+    |  B_X
+    |    B_cmpltu_x0 AT1, TMP1, AT
+    |    B_cmpltu_x1 TMP0, TMP2, AT
+    |  B_X
+    |    B_and_x0 AT, AT1, TMP0
+    |    //load_got pow
+    |    B_addli_x1 CFUNCADDR, DISPATCH, DISPATCH_GOT(pow)
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_ld_x1 CFUNCADDR, CFUNCADDR
     |  beqz AT, ->vmeta_arith
     |  call_extern
     |  ins_next1
@@ -4504,29 +4524,43 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_CAT:
     |  // RA = dst*8, RB = src_start*8, RC = src_end*8
     |  decode_RB8a RB, INS
-    |  decode_RB8b RB
-    |   decode_RDtoRC8 RC, RD
-    |  sub CARG3, RC, RB
-    |   addlo AT, L->base
-    |   st AT, BASE
-    |  add CARG2, BASE, RC
+    |  //decode_RB8b RB
+    |  bfextu RB, RB, 3, 10
+    |  B_X
+    |    //decode_RDtoRC8 RC, RD
+    |    B_bfextu_x0 RC, RD, 3, 10
+    |    B_shli_x1 RB, RB, 3
+    |  shli RC, RC, 3
+    |  B_X
+    |    B_sub_x0 CARG3, RC, RB
+    |    B_addlo_x1 AT, L->base
+    |  B_X
+    |    B_add_x0 CARG2, BASE, RC
+    |    B_st_x1 AT, BASE
     |  move MULTRES, RB
     |->BC_CAT_Z:
-    |  load_got lj_meta_cat
-    |  shrui CARG3, CARG3, 3
-    |   addi AT, sp, SAVE_PC
-    |   st AT, PC
-    |  move CARG1, L
-    |  call_intern lj_meta_cat		// (lua_State *L, TValue *top, int left)
+    |  //load_got lj_meta_cat
+    |  B_X
+    |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_meta_cat)
+    |    B_shrui_x1 CARG3, CARG3, 3
+    |  B_X
+    |    B_addi_x0 AT, sp, SAVE_PC
+    |    B_ld_x1 CFUNCADDR, CFUNCADDR
+    |  B_X
+    |    B_move_x0 CARG1, L
+    |    B_st_x1 AT, PC
+    |  B_X
+    |    B_addlo_x0 CROSSTMP1, L:LREG->base
+    |    B_jalr_x1 CFUNCADDR		// (lua_State *L, TValue *top, int left)
     |  // Returns NULL (finished) or TValue * (metamethod).
-    |  addlo BASE, L:LREG->base
-    |  ld BASE, BASE
+    |  ld BASE, CROSSTMP1
     |  bnez CRET1, ->vmeta_binop
     |  add RB, BASE, MULTRES
-    |  ld AT2, RB
-    |   add RA, BASE, RA
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_ld_x1 AT2, RB
     |  ins_next1
-    |   st RA, AT2			// Copy result from RB to RA.
+    |  st RA, AT2			// Copy result from RB to RA.
     |  ins_next2
     break;
 
