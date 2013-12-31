@@ -411,7 +411,8 @@ local map_op = {
   B_ld1u_x1_2 =		"50D500002DA",
   B_ld1s_x1_2 =		"50D4F0002DA",
   B_ld_add_x1_3 =	"314000002DAE",
-  B_ld4u_add_x1_3 =	"30c000002DAE",
+  B_ld4u_add_x1_3 =	"30C000002DAE",
+  B_ld4s_add_x1_3 =	"30B000002DAE",
 
   -- Control Instructions.
   B_j_x1_1 =		"480000002J",
