@@ -4190,9 +4190,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_shrui_x1 TMP1, RD, 3
     |  B_X
     |    B_addi_x0 TMP0, RA, HI
-    |    B_addli_x1 PC, PC, 4
+    |    B_addi_x1 TMP2, PC, OFS_RD
     |  B_X
-    |    B_addi_x0 TMP2, PC, OFS_RD
+    |    B_addi_x0 PC, PC, 4
     |    B_ld4s_x1 TMP0, TMP0
     |  B_X
     |    B_nor_x0 TMP1, TMP1, zero
@@ -4615,12 +4615,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_UGET:
     |  // RA = dst*8, RD = uvnum*8
     |  addi LFUNC:RB, BASE, FRAME_FUNC
-    |  ld4s LFUNC:RB, LFUNC:RB
-    |   shrui RD, RD, 1
-    |   add RD, RD, LFUNC:RB
-    |  addlo UPVAL:RB, LFUNC:RD->uvptr
+    |  B_X
+    |    B_shrui_x0 RD, RD, 1
+    |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
+    |  add RD, RD, LFUNC:RB
+    |  B_X
+    |    B_addlo_x0 UPVAL:RB, LFUNC:RD->uvptr
+    |    // ins_next1
+    |    B_ld4u_add_x1 INS, PC, 4
     |  ld4u UPVAL:RB, UPVAL:RB
-    |  ins_next1
     |  addlo TMP1, UPVAL:RB->v
     |  ld4u TMP1, TMP1
     |  ld AT2, TMP1
@@ -4631,103 +4634,136 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_USETV:
     |  // RA = uvnum*8, RD = src*8
     |  addi LFUNC:RB, BASE, FRAME_FUNC
-    |  ld4s LFUNC:RB, LFUNC:RB
-    |    shrui RA, RA, 1
-    |   add RD, BASE, RD
-    |    add RA, RA, LFUNC:RB
-    |   ld AT2, RD
-    |  addlo UPVAL:RB, LFUNC:RA->uvptr
+    |  B_X
+    |    B_shrui_x0 RA, RA, 1
+    |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
+    |  B_X
+    |    B_add_x0 RD, BASE, RD
+    |    B_add_x1 RA, RA, LFUNC:RB
+    |  B_X
+    |    B_addlo_x0 UPVAL:RB, LFUNC:RA->uvptr
+    |    B_ld_x1 AT2, RD
     |  ld4u UPVAL:RB, UPVAL:RB
     |  addlo TMP3, UPVAL:RB->marked
-    |  ld1u TMP3, TMP3
-    |   addlo CARG2, UPVAL:RB->v
-    |   ld4u CARG2, CARG2
-    |  andi TMP3, TMP3, LJ_GC_BLACK	// isblack(uv)
+    |  B_X
+    |    B_addlo_x0 CARG2, UPVAL:RB->v
+    |    B_ld1u_x1 TMP3, TMP3
+    |  B_X
+    |    B_andi_x0 TMP3, TMP3, LJ_GC_BLACK	// isblack(uv)
+    |    B_ld4u_x1 CARG2, CARG2
     |  addlo TMP0, UPVAL:RB->closed
-    |  ld1u TMP0, TMP0
-    |   addi TMP2, RD, HI
-    |   ld4s TMP2, TMP2
-    |   st CARG2, AT2
-    |  addi AT, zero, LJ_GC_BLACK|1
-    |  or TMP3, TMP3, TMP0
+    |  B_X
+    |    B_addi_x0 TMP2, RD, HI
+    |    B_ld1u_x1 TMP0, TMP0
+    |  B_X
+    |    B_or_x0 TMP3, TMP3, TMP0
+    |    B_ld4s_x1 TMP2, TMP2
+    |  B_X
+    |    B_addi_x0 AT, zero, LJ_GC_BLACK|1
+    |    B_st_x1 CARG2, AT2
     |  cmpeq AT, TMP3, AT
     |  bnez AT, >2			// Upvalue is closed and black?
     |1:
     |  ins_next
     |
     |2:  // Check if new value is collectable.
-    |  addi AT, zero, LJ_TISGCV
-    |  moveli AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-    |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
-    |  sub AT2, TMP2, AT
+    |  B_X
+    |    B_addi_x0 AT, zero, LJ_TISGCV
+    |    B_moveli_x1 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  B_X
+    |    B_shl16insli_x0 AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
+    |    B_sub_x1 AT2, TMP2, AT
     |  sub AT3, AT1, AT
     |  bfextu AT3, AT3, 0, 31
-    |  cmpltu AT, AT2, AT3
-    |  addi TMP1, RD, LO
+    |  B_X
+    |    B_cmpltu_x0 AT, AT2, AT3
+    |    B_addi_x1 TMP1, RD, LO
     |  ld4s TMP1, TMP1
-    |  bnez AT, <1			// tvisgcv(v)
-    |  addlo TMP3, GCOBJ:TMP1->gch.marked
-    |  ld1u TMP3, TMP3
-    |  andi TMP3, TMP3, LJ_GC_WHITES	// iswhite(v)
-    |  load_got lj_gc_barrieruv
+    |  B_X
+    |    B_addlo_x0 TMP3, GCOBJ:TMP1->gch.marked
+    |    B_bnez_x1 AT, <1			// tvisgcv(v)
+    |  B_X
+    |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_gc_barrieruv)
+    |    B_ld1u_x1 TMP3, TMP3
+    |  B_X
+    |    B_andi_x0 TMP3, TMP3, LJ_GC_WHITES	// iswhite(v)
+    |    //load_got lj_gc_barrieruv
+    |    B_ld_x1 CFUNCADDR, CFUNCADDR
     |  beqz TMP3, <1
     |  // Crossed a write barrier. Move the barrier forward.
-    |  addli CARG1, DISPATCH, GG_DISP2G
-    |  call_intern lj_gc_barrieruv	// (global_State *g, TValue *tv)
+    |  B_X
+    |    B_addli_x0 CARG1, DISPATCH, GG_DISP2G
+    |    B_jalr_x1 CFUNCADDR
     |  b <1
     break;
   case BC_USETS:
     |  // RA = uvnum*8, RD = str_const*8 (~)
     |  addi LFUNC:RB, BASE, FRAME_FUNC
-    |  ld4s LFUNC:RB, LFUNC:RB
-    |    shrui RA, RA, 1
-    |   shrui TMP1, RD, 1
-    |    add RA, RA, LFUNC:RB
-    |   sub TMP1, KBASE, TMP1
-    |  addlo UPVAL:RB, LFUNC:RA->uvptr
-    |  ld4u UPVAL:RB, UPVAL:RB
-    |   addi STR:TMP1, TMP1, -4
-    |   ld4u STR:TMP1, STR:TMP1
-    |  addlo TMP2, UPVAL:RB->marked
-    |  ld1u TMP2, TMP2
-    |   addlo CARG2, UPVAL:RB->v
-    |   ld4u CARG2, CARG2
-    |   addlo TMP3, STR:TMP1->marked
-    |   ld1u TMP3, TMP3
-    |  andi AT, TMP2, LJ_GC_BLACK	// isblack(uv)
-    |   addlo TMP2, UPVAL:RB->closed
-    |   ld1u TMP2, TMP2
-    |   addi TMP0, zero, LJ_TSTR
-    |   addi AT1, CARG2, LO
-    |   st4 AT1, STR:TMP1
-    |  addi AT1, CARG2, HI
+    |  B_X
+    |    B_shrui_x0 RA, RA, 1
+    |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
+    |  B_X
+    |    B_shrui_x0 TMP1, RD, 1
+    |    B_add_x1 RA, RA, LFUNC:RB
+    |  B_X
+    |    B_sub_x0 TMP1, KBASE, TMP1
+    |    B_addlo_x1 UPVAL:RB, LFUNC:RA->uvptr
+    |  B_X
+    |    B_addi_x0 STR:TMP1, TMP1, -4
+    |    B_ld4u_x1 UPVAL:RB, UPVAL:RB
+    |  B_X
+    |    B_addlo_x0 TMP2, UPVAL:RB->marked
+    |    B_ld4u_x1 STR:TMP1, STR:TMP1
+    |  B_X
+    |    B_addlo_x0 CARG2, UPVAL:RB->v
+    |    B_ld1u_x1 TMP2, TMP2
+    |  B_X
+    |    B_addlo_x0 TMP3, STR:TMP1->marked
+    |    B_ld4u_x1 CARG2, CARG2
+    |  B_X
+    |    B_andi_x0 AT, TMP2, LJ_GC_BLACK	// isblack(uv)
+    |    B_ld1u_x1 TMP3, TMP3
+    |  addlo TMP2, UPVAL:RB->closed
+    |  B_X
+    |    B_addi_x0 TMP0, zero, LJ_TSTR
+    |    B_ld1u_x1 TMP2, TMP2
+    |  B_X
+    |    B_addi_x0 AT1, CARG2, HI
+    |    B_st4_x1 CARG2, STR:TMP1
     |  st4 AT1, TMP0
     |  bnez AT, >2
     |1:
     |  ins_next
     |
     |2:  // Check if string is white and ensure upvalue is closed.
-    |  andi AT, TMP3, LJ_GC_WHITES	// iswhite(str)
-    |  beqz TMP2, <1
+    |  B_X
+    |    B_andi_x0 AT, TMP3, LJ_GC_WHITES	// iswhite(str)
+    |    B_beqz_x1 TMP2, <1
     |  load_got lj_gc_barrieruv
-    |  beqz AT, <1
+    |  B_X
+    |    B_addli_x0 CARG1, DISPATCH, GG_DISP2G
+    |    B_beqz_x1 AT, <1
     |  // Crossed a write barrier. Move the barrier forward.
-    |  addli CARG1, DISPATCH, GG_DISP2G
     |  call_intern lj_gc_barrieruv	// (global_State *g, TValue *tv)
     |  b <1
     break;
   case BC_USETN:
     |  // RA = uvnum*8, RD = num_const*8
     |  addi LFUNC:RB, BASE, FRAME_FUNC
-    |  ld4s LFUNC:RB, LFUNC:RB
-    |   shrui RA, RA, 1
-    |    add RD, KBASE, RD
-    |   add RA, RA, LFUNC:RB
-    |    ld AT2, RD
-    |  addlo UPVAL:RB, LFUNC:RA->uvptr
+    |  B_X
+    |    B_shrui_x0 RA, RA, 1
+    |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
+    |  B_X
+    |    B_add_x0 RD, KBASE, RD
+    |    B_add_x1 RA, RA, LFUNC:RB
+    |  B_X
+    |    B_addlo_x0 UPVAL:RB, LFUNC:RA->uvptr
+    |    B_ld_x1 AT2, RD
     |  ld4u UPVAL:RB, UPVAL:RB
-    |  ins_next1
-    |  addlo TMP1, UPVAL:RB->v
+    |  B_X
+    |    B_addlo_x0 TMP1, UPVAL:RB->v
+    |    //ins_next1
+    |    B_ld4u_add_x1 INS, PC, 4
     |  ld4u TMP1, TMP1
     |  st TMP1, AT2
     |  ins_next2
@@ -4735,15 +4771,20 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_USETP:
     |  // RA = uvnum*8, RD = primitive_type*8 (~)
     |  addi LFUNC:RB, BASE, FRAME_FUNC
-    |  ld4s LFUNC:RB, LFUNC:RB
-    |   shrui RA, RA, 1
-    |    shrui TMP0, RD, 3
-    |   add RA, RA, LFUNC:RB
-    |    nor TMP0, TMP0, zero
-    |  addlo UPVAL:RB, LFUNC:RA->uvptr
+    |  B_X
+    |    B_shrui_x0 RA, RA, 1
+    |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
+    |  B_X
+    |    B_shrui_x0 TMP0, RD, 3
+    |    B_add_x1 RA, RA, LFUNC:RB
+    |  B_X
+    |    B_nor_x0 TMP0, TMP0, zero
+    |    B_addlo_x1 UPVAL:RB, LFUNC:RA->uvptr
     |  ld4u UPVAL:RB, UPVAL:RB
-    |  ins_next1
-    |  addlo TMP1, UPVAL:RB->v
+    |  B_X
+    |    B_addlo_x0 TMP1, UPVAL:RB->v
+    |    //ins_next1
+    |    B_ld4u_add_x1 INS, PC, 4
     |  ld4u TMP1, TMP1
     |  addi AT, TMP1, HI
     |  st4 AT, TMP0
@@ -4752,15 +4793,21 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 
   case BC_UCLO:
     |  // RA = level*8, RD = target
-    |  addlo TMP2, L->openupval
+    |  B_X
+    |    B_addlo_x0 TMP2, L->openupval
+    |    B_addli_x1 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_func_closeuv)
     |  ld4u TMP2, TMP2
     |  branch_RD			// Do this first since RD is not saved.
-    |  load_got lj_func_closeuv
-    |   addlo AT, L->base
-    |   st AT, BASE
-    |  move CARG1, L
-    |  beqz TMP2, >1
-    |  add CARG2, BASE, RA
+    |  //load_got lj_func_closeuv
+    |  B_X
+    |    B_addlo_x0 AT, L->base
+    |    B_ld_x1 CFUNCADDR, CFUNCADDR
+    |  B_X
+    |    B_move_x0 CARG1, L
+    |    B_st_x1 AT, BASE
+    |  B_X
+    |    B_add_x0 CARG2, BASE, RA
+    |    B_beqz_x1 TMP2, >1
     |  call_intern lj_func_closeuv	// (lua_State *L, TValue *level)
     |  addlo BASE, L->base
     |  ld BASE, BASE
@@ -4770,30 +4817,42 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 
   case BC_FNEW:
     |  // RA = dst*8, RD = proto_const*8 (~) (holding function prototype)
-    |  shrui TMP1, RD, 1
-    |  load_got lj_func_newL_gc
-    |  sub TMP1, KBASE, TMP1
+    |  B_X
+    |    B_shrui_x0 TMP1, RD, 1
+    |    //load_got lj_func_newL_gc
+    |    B_addli_x1 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_func_newL_gc)
+    |  B_X
+    |    B_sub_x0 TMP1, KBASE, TMP1
+    |    B_ld_x1 CFUNCADDR, CFUNCADDR
     |  addi CARG3, BASE, FRAME_FUNC
-    |  ld4s CARG3, CARG3
-    |  addi CARG2, TMP1, -4
-    |  ld4s CARG2, CARG2
-    |   addlo AT, L:LREG->base
-    |   st AT, BASE
-    |   addi AT, sp, SAVE_PC
-    |   st AT, PC
+    |  B_X
+    |    B_addi_x0 CARG2, TMP1, -4
+    |    B_ld4s_x1 CARG3, CARG3
+    |  B_X
+    |    B_addlo_x0 AT, L:LREG->base
+    |    B_ld4s_x1 CARG2, CARG2
+    |  B_X
+    |    B_addi_x0 AT1, sp, SAVE_PC
+    |    B_st_x1 AT, BASE
+    |  B_X
+    |    B_move_x0 CARG1, L
+    |    B_st_x1 AT1, PC
     |  // (lua_State *L, GCproto *pt, GCfuncL *parent)
-    |  move CARG1, L
     |  call_intern lj_func_newL_gc
     |  // Returns GCfuncL *.
     |  addlo BASE, L->base
-    |  ld BASE, BASE
-    |   addi TMP0, zero, LJ_TFUNC
-    |  ins_next1
-    |  add RA, BASE, RA
+    |  B_X
+    |    B_addi_x0 TMP0, zero, LJ_TFUNC
+    |    B_ld_x1 BASE, BASE
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    //ins_next1
+    |    B_ld4u_add_x1 INS, PC, 4
     |  addi AT, RA, HI
-    |  st4 AT, TMP0
-    |  addi AT, RA, LO
-    |  st4 AT, LFUNC:CRET1
+    |  B_X
+    |    B_addi_x0 AT1, RA, LO
+    |    B_st4_x1 AT, TMP0
+    |  st4 AT1, LFUNC:CRET1
     |  ins_next2
     break;
 
