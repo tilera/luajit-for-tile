@@ -4535,84 +4535,101 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_KSTR:
     |  // RA = dst*8, RD = str_const*8 (~)
     |  shrui TMP1, RD, 1
-    |  sub TMP1, KBASE, TMP1
-    |  ins_next1
+    |  B_X
+    |    B_sub_x0 TMP1, KBASE, TMP1
+    |    //ins_next1
+    |    B_ld4u_add_x1 INS, PC, 4
     |  addi TMP0, TMP1, -4
-    |  ld4u TMP0, TMP0
-    |  add RA, BASE, RA
-    |   addi TMP2, zero, LJ_TSTR
-    |  addi AT, RA, LO
-    |  st4 AT, TMP0
-    |  addi AT, RA, HI
-    |   st4 AT, TMP2
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_ld4u_x1 TMP0, TMP0
+    |  B_Y3
+    |    B_addi_y0 TMP2, zero, -5 // LJ_TSTR
+    |    B_addi_y1 AT, RA, HI
+    |    B_st4_y2 RA, TMP0
+    |  st4 AT, TMP2
     |  ins_next2
     break;
   case BC_KCDATA:
     |.if FFI
     |  // RA = dst*8, RD = cdata_const*8 (~)
     |  shrui TMP1, RD, 1
-    |  sub TMP1, KBASE, TMP1
-    |  ins_next1
+    |  B_X
+    |    B_sub_x0 TMP1, KBASE, TMP1
+    |    //ins_next1
+    |    B_ld4u_add_x1 INS, PC, 4
     |  addi TMP0, TMP1, -4
-    |  ld4u TMP0, TMP0
-    |  add RA, BASE, RA
-    |   addi TMP2, zero, LJ_TCDATA
-    |  addi AT, RA, LO
-    |  st4 AT, TMP0
-    |  addi AT, RA, HI
-    |   st4 AT, TMP2
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_ld4u_x1 TMP0, TMP0
+    |  B_Y3
+    |    B_addi_y0 TMP2, zero, -11 // LJ_TCDATA
+    |    B_addi_y1 AT, RA, HI
+    |    B_st4_y2 RA, TMP0
+    |  st4 AT, TMP2
     |  ins_next2
     |.endif
     break;
   case BC_KSHORT:
     |  // RA = dst*8, RD = int16_literal*8
     |  bfexts RD, INS, 16, 31
-    |  cmpltsi AT, RD, 0
-    |  sub AT1, zero, RD
-    |  moveli AT2, 539
-    |  cmovnez RD, AT, AT1
-    |  shli AT2, AT2, 8
-    |  shli AT1, RD, 4
+    |  B_X
+    |    B_cmpltsi_x0 AT, RD, 0
+    |    B_sub_x1 AT1, zero, RD
+    |  B_X
+    |    B_cmovnez_x0 RD, AT, AT1
+    |    B_moveli_x1 AT2, 539
+    |  B_X
+    |    B_shli_x0 AT2, AT2, 8
+    |    B_shli_x1 AT1, RD, 4
     |  bfins AT2, AT, 20, 20
     |  fdouble_pack1 RD, AT1, AT2
-    |  fdouble_pack2 RD, AT1, zero
-    |  add RA, BASE, RA
+    |  B_X
+    |    B_fdouble_pack2_x0 RD, AT1, zero
+    |    B_add_x1 RA, BASE, RA
     |  ins_next1
     |  st RA, RD
     |  ins_next2
     break;
   case BC_KNUM:
     |  // RA = dst*8, RD = num_const*8
-    |  add RD, KBASE, RD
-    |   add RA, BASE, RA
+    |  B_X
+    |    B_add_x0 RD, KBASE, RD
+    |    B_add_x1 RA, BASE, RA
     |  ld AT, RD
     |  ins_next1
-    |   st RA, AT
+    |  st RA, AT
     |  ins_next2
     break;
   case BC_KPRI:
     |  // RA = dst*8, RD = primitive_type*8 (~)
-    |  shrui TMP1, RD, 3
-    |   add RA, BASE, RA
-    |  nor TMP0, TMP1, zero
-    |  ins_next1
-    |   addi AT, RA, HI
-    |   st4 AT, TMP0
+    |  B_X
+    |    B_shrui_x0 TMP1, RD, 3
+    |    B_add_x1 RA, BASE, RA
+    |  B_X
+    |    B_nor_x0 TMP0, TMP1, zero
+    |    //ins_next1
+    |    B_ld4u_add_x1 INS, PC, 4
+    |  addi AT, RA, HI
+    |  st4 AT, TMP0
     |  ins_next2
     break;
   case BC_KNIL:
     |  // RA = base*8, RD = end*8
     |  add RA, BASE, RA
     |  addi AT, RA, HI
-    |  st4 AT, TISNIL
-    |   addi RA, RA, 8
+    |  B_X
+    |    B_addi_x0 RA, RA, 8
+    |    B_st4_x1 AT, TISNIL
     |  add RD, BASE, RD
     |1:
-    |  addi AT, RA, HI
-    |  st4 AT, TISNIL
-    |  cmplts AT, RA, RD
-    |  addi RA, RA, 8
-    |  bnez AT, <1
+    |  addi AT1, RA, HI
+    |  B_X
+    |    B_cmplts_x0 AT, RA, RD
+    |    B_st4_x1 AT1, TISNIL
+    |  B_X
+    |    B_addi_x0 RA, RA, 8
+    |    B_bnez_x1 AT, <1
     |  ins_next_
     break;
 
