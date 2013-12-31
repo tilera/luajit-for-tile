@@ -29,11 +29,6 @@
 |.define RA,		r37	// RA need to be callee-save.
 |.define CROSSTMP1,	r38	// TMP used to hold variable which need to be alive across C call.
 |.define CROSSTMP2,	r39
-|.define CROSSTMP3,	r40
-|.define CROSSTMP4,	r41
-|.define CROSSTMP5,	r42
-|.define CROSSTMP6,	r43
-|.define CROSSTMP7,	r44
 |.define ASMENTRY,	r45
 |
 |.define JGL,		r52	// On-trace: global_State + 32768.
@@ -77,14 +72,14 @@
 |.define CRET2,		r1
 |
 |// Stack layout while in interpreter. Must match with lj_frame.h.
-|.define CFRAME_SPACE,	176	// Delta for sp.
+|.define CFRAME_SPACE,	136	// Delta for sp.
 |
-|.define SAVE_ERRF,	200	// 64 bit C frame info.
-|.define SAVE_NRES,	192
-|.define SAVE_CFRAME,	184
-|.define SAVE_L,	176
+|.define SAVE_ERRF,	160	// 64 bit C frame info.
+|.define SAVE_NRES,	152
+|.define SAVE_CFRAME,	144
+|.define SAVE_L,	136
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by interpreter.
-|.define TILE_ABI_RESERV,	32	// .. 32+18*8: 64 bit GPR saves.
+|.define TILE_ABI_RESERV,	32	// .. 32+13*8: 64 bit GPR saves.
 |.define SAVE_MULTRES,		24	
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
@@ -581,11 +576,6 @@
 |  st_add sp, r37, -8
 |  st_add sp, r38, -8
 |  st_add sp, r39, -8
-|  st_add sp, r40, -8
-|  st_add sp, r41, -8
-|  st_add sp, r42, -8
-|  st_add sp, r43, -8
-|  st_add sp, r44, -8
 |  st_add sp, r45, -8
 |  st_add sp, r52, -8
 |  st_add sp, lr, -TILE_ABI_RESERV
@@ -596,11 +586,6 @@
 |  ld_add lr, sp, 8
 |  ld_add r52, sp, 8
 |  ld_add r45, sp, 8
-|  ld_add r44, sp, 8
-|  ld_add r43, sp, 8
-|  ld_add r42, sp, 8
-|  ld_add r41, sp, 8
-|  ld_add r40, sp, 8
 |  ld_add r39, sp, 8
 |  ld_add r38, sp, 8
 |  ld_add r37, sp, 8
@@ -1138,11 +1123,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  st_add sp, r37, -8
   |  st_add sp, r38, -8
   |  st_add sp, r39, -8
-  |  st_add sp, r40, -8
-  |  st_add sp, r41, -8
-  |  st_add sp, r42, -8
-  |  st_add sp, r43, -8
-  |  st_add sp, r44, -8
   |  st_add sp, r45, -8
   |  st_add sp, r52, -8
   |  B_X
@@ -1233,11 +1213,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  st_add sp, r37, -8
   |  st_add sp, r38, -8
   |  st_add sp, r39, -8
-  |  st_add sp, r40, -8
-  |  st_add sp, r41, -8
-  |  st_add sp, r42, -8
-  |  st_add sp, r43, -8
-  |  st_add sp, r44, -8
   |  st_add sp, r45, -8
   |  st_add sp, r52, -8
   |  B_X
@@ -1318,11 +1293,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  st_add sp, r37, -8
   |  st_add sp, r38, -8
   |  st_add sp, r39, -8
-  |  st_add sp, r40, -8
-  |  st_add sp, r41, -8
-  |  st_add sp, r42, -8
-  |  st_add sp, r43, -8
-  |  st_add sp, r44, -8
   |  st_add sp, r45, -8
   |  st_add sp, r52, -8
   |  B_X
@@ -4227,18 +4197,23 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 
   case BC_ISTC: case BC_ISFC: case BC_IST: case BC_ISF:
     |  // RA = dst*8 or unused, RD = src*8, JMP with RD = target
-    |  add RD, BASE, RD
-    |   addi TMP2, PC, OFS_RD
-    |   ld2u TMP2, TMP2
-    |  addi TMP0, RD, HI
-    |  ld4s TMP0, TMP0
-    |   addi PC, PC, 4
+    |  B_X
+    |    B_add_x0 RD, BASE, RD
+    |    B_addi_x1 TMP2, PC, OFS_RD
+    |  B_X
+    |    B_addi_x0 TMP0, RD, HI
+    |    B_ld2u_x1 TMP2, TMP2
+    |  B_X
+    |    B_addi_x0 PC, PC, 4
+    |    B_ld4s_x1 TMP0, TMP0
     if (op == BC_IST || op == BC_ISF) {
-      |  cmpltui TMP0, TMP0, LJ_TISTRUECOND
-      |   decode_RD4b TMP2
-      |   moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
-      |   shl16insli TMP3, TMP3, 0
-      |   add TMP2, TMP2, TMP3
+      |  B_X
+      |    B_cmpltui_x0 TMP0, TMP0, LJ_TISTRUECOND
+      |    //decode_RD4b TMP2
+      |    B_shli_x1 TMP2, TMP2, 2
+      |  moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+      |  shl16insli TMP3, TMP3, 0
+      |  add TMP2, TMP2, TMP3
       if (op == BC_IST) {
 	|  cmoveqz TMP2, TMP0, zero
       } else {
@@ -4246,20 +4221,24 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       }
       |  add PC, PC, TMP2
     } else {
-      |  cmpltui TMP0, TMP0, LJ_TISTRUECOND
-      |  ld AT2, RD
+      |  B_X
+      |    B_cmpltui_x0 TMP0, TMP0, LJ_TISTRUECOND
+      |    B_ld_x1 AT2, RD
       |  add RA, BASE, RA
       if (op == BC_ISTC) {
 	|  beqz TMP0, >1
       } else {
 	|  bnez TMP0, >1
       }
-      |   decode_RD4b TMP2
-      |   moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
-      |   shl16insli TMP3, TMP3, 0
-      |   add TMP2, TMP2, TMP3
-      |   st RA, AT2
-      |   add PC, PC, TMP2
+      |  //decode_RD4b TMP2
+      |  B_X
+      |    B_shli_x0 TMP2, TMP2, 2
+      |    B_moveli_x1 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+      |  shl16insli TMP3, TMP3, 0
+      |  B_X
+      |    B_add_x0 TMP2, TMP2, TMP3
+      |    B_st_x1 RA, AT2
+      |  add PC, PC, TMP2
       |1:
     }
     |  ins_next
@@ -4269,8 +4248,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 
   case BC_MOV:
     |  // RA = dst*8, RD = src*8
-    |  add RD, BASE, RD
-    |  add RA, BASE, RA
+    |  B_X
+    |    B_add_x0 RD, BASE, RD
+    |    B_add_x1 RA, BASE, RA
     |  ld AT2, RD
     |  ins_next1
     |  st RA, AT2
@@ -4278,61 +4258,80 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     break;
   case BC_NOT:
     |  // RA = dst*8, RD = src*8
-    |  add RD, BASE, RD
-    |   add RA, BASE, RA
-    |  addi TMP0, RD, HI
-    |  ld4s TMP0, TMP0
-    |   addi TMP1, zero, LJ_TFALSE
+    |  B_X
+    |    B_add_x0 RD, BASE, RD
+    |    B_add_x1 RA, BASE, RA
+    |  B_X
+    |    B_addi_x0 TMP0, RD, HI
+    |    B_addi_x1 TMP1, zero, LJ_TFALSE
+    |  B_X
+    |    B_addi_x0 AT, RA, HI
+    |    B_ld4s_x1 TMP0, TMP0
     |  cmpltui TMP0, TMP0, LJ_TISTRUECOND
-    |  addli TMP1, TMP0, LJ_TTRUE
-    |  ins_next1
-    |  addi AT, RA, HI
+    |  B_X
+    |    B_addli_x0 TMP1, TMP0, LJ_TTRUE
+    |    //ins_next1
+    |    B_ld4u_add_x1 INS, PC, 4
     |  st4 AT, TMP1
     |  ins_next2
     break;
   case BC_UNM:
     |  // RA = dst*8, RD = src*8
-    |  add CARG3, BASE, RD
-    |   add RA, BASE, RA
-    |  addi TMP0, CARG3, HI
-    |  ld4s TMP0, TMP0
-    |   ld AT2, CARG3
-    |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  B_X
+    |    B_add_x0 CARG3, BASE, RD
+    |    B_add_x1 RA, BASE, RA
+    |  B_X
+    |    B_addi_x0 TMP0, CARG3, HI
+    |    B_ld_x1 AT2, CARG3
+    |  B_X
+    |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |    B_ld4s_x1 TMP0, TMP0
     |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-    |  cmpltu AT, TMP0, AT
-    |  movei AT1, -1
+    |  B_X
+    |    B_cmpltu_x0 AT, TMP0, AT
+    |    B_movei_x1 AT1, -1
     |  shli AT1, AT1, 63
-    |  xor AT2, AT2, AT1
-    |  beqz AT, ->vmeta_unm
+    |  B_X
+    |    B_xor_x0 AT2, AT2, AT1
+    |    B_beqz_x1 AT, ->vmeta_unm
     |  ins_next1
-    |   st RA, AT2
+    |  st RA, AT2
     |  ins_next2
     break;
   case BC_LEN:
     |  // RA = dst*8, RD = src*8
-    |  add CARG2, BASE, RD
-    |   add RA, BASE, RA
-    |  addi TMP0, CARG2, HI
-    |  ld4s TMP0, TMP0
-    |   addi CARG1, CARG2, LO
-    |   ld4s CARG1, CARG1
-    |  addi AT1, zero, LJ_TSTR
-    |  addi AT, zero, LJ_TTAB
-    |  cmpne AT1, TMP0, AT1
-    |  bnez AT1, >2
-    |  addlo CRET1, STR:CARG1->len
-    |  ld4u CRET1, CRET1
+    |  B_X
+    |    B_add_x0 CARG2, BASE, RD
+    |    B_add_x1 RA, BASE, RA
+    |  B_X
+    |    B_addi_x0 TMP0, CARG2, HI
+    |    B_ld4s_x1 CARG1, CARG2
+    |  B_X
+    |    B_addi_x0 AT1, zero, LJ_TSTR
+    |    B_ld4s_x1 TMP0, TMP0
+    |  B_X
+    |    B_addi_x0 AT, zero, LJ_TTAB
+    |    B_cmpne_x1 AT1, TMP0, AT1
+    |  B_X
+    |    B_addlo_x0 AT2, STR:CARG1->len
+    |    B_bnez_x1 AT1, >2
+    |  ld4u CRET1, AT2
     |1:
-    |  cmpltsi AT, CRET1, 0
-    |  sub AT1, zero, CRET1
-    |  moveli AT2, 539
-    |  cmovnez CRET1, AT, AT1
-    |  shli AT2, AT2, 8
-    |  shli AT1, CRET1, 4
+    |  B_X
+    |    B_cmpltsi_x0 AT, CRET1, 0
+    |    B_sub_x1 AT1, zero, CRET1
+    |  B_X
+    |    B_cmovnez_x0 CRET1, AT, AT1
+    |    B_moveli_x1 AT2, 539
+    |  B_X
+    |    B_shli_x0 AT2, AT2, 8
+    |    B_shli_x1 AT1, CRET1, 4
     |  bfins AT2, AT, 20, 20
     |  fdouble_pack1 CRET1, AT1, AT2
-    |  fdouble_pack2 CRET1, AT1, zero
-    |  ins_next1
+    |  B_X
+    |    B_fdouble_pack2_x0 CRET1, AT1, zero
+    |    //ins_next1
+    |    B_ld4u_add_x1 INS, PC, 4
     |  st RA, CRET1
     |  ins_next2
     |2:
