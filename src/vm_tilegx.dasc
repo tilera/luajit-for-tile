@@ -3386,85 +3386,118 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->fff_fallback:			// Call fast function fallback handler.
   |  // BASE = new base, RB = CFUNC, RC = nargs*8
-  |  addlo TMP3, CFUNC:RB->f
-  |  ld TMP3, TMP3
-  |    add TMP1, BASE, NARGS8:RC
-  |   addi PC, BASE, FRAME_PC
-  |   ld4s PC, PC
-  |    addli TMP0, TMP1, 8*LUA_MINSTACK
-  |     addlo TMP2, L:LREG->maxstack
-  |     ld4u TMP2, TMP2
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |  cmpltu AT, TMP2, TMP0
-  |     addlo AT1, L->base
-  |     st AT1, BASE
-  |     addlo AT1, L->top
-  |    st AT1, TMP1
-  |  move CFUNCADDR, TMP3
+  |  B_X
+  |    B_addlo_x0 TMP3, CFUNC:RB->f
+  |    B_addi_x1 PC, BASE, FRAME_PC
+  |  B_X
+  |    B_add_x0 TMP1, BASE, NARGS8:RC
+  |    B_ld_x1 TMP3, TMP3
+  |  B_X
+  |    B_addli_x0 TMP0, TMP1, 8*LUA_MINSTACK
+  |    B_ld4s_x1 PC, PC
+  |  B_X
+  |    B_addlo_x0 TMP2, L:LREG->maxstack
+  |    B_addlo_x1 AT2, L->top
+  |  B_X
+  |    B_addi_x0 AT, sp, SAVE_PC
+  |    B_ld4u_x1 TMP2, TMP2
+  |  B_X
+  |    B_cmpltu_x0 AT, TMP2, TMP0
+  |    B_st_x1 AT, PC
+  |  B_X
+  |    B_addlo_x0 AT1, L->base
+  |    B_st_x1 AT2, TMP1
+  |  B_X
+  |    B_move_x0 CFUNCADDR, TMP3
+  |    B_st_x1 AT1, BASE
   |  bnez AT, >5			// Need to grow stack.
-  |  move CARG1, L
-  |  jalr TMP3				// (lua_State *L)
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    B_jalr_x1 TMP3				// (lua_State *L)
   |  // Either throws an error, or recovers and returns -1, 0 or nresults+1.
   |  addlo BASE, L->base
-  |  ld BASE, BASE
-  |   shli RD, CRET1, 3
-  |  addli RA, BASE, -8
-  |  bgtz CRET1, ->fff_res		// Returned nresults+1?
+  |  B_X
+  |    B_shli_x0 RD, CRET1, 3
+  |    B_ld_x1 BASE, BASE
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_bgtz_x1 CRET1, ->fff_res		// Returned nresults+1?
   |1:  // Returned 0 or -1: retry fast path.
   |  addlo TMP0, L->top
-  |  ld TMP0, TMP0
-  |   addi LFUNC:RB, BASE, FRAME_FUNC
-  |   ld4s LFUNC:RB, LFUNC:RB
-  |  sub NARGS8:RC, TMP0, BASE
+  |  B_X
+  |    B_addi_x0 LFUNC:RB, BASE, FRAME_FUNC
+  |    B_ld_x1 TMP0, TMP0
+  |  B_X
+  |    B_sub_x0 NARGS8:RC, TMP0, BASE
+  |    B_ld4s_x1 LFUNC:RB, LFUNC:RB
   |  bnez CRET1, ->vm_call_tail		// Returned -1?
   |  ins_callt				// Returned 0: retry fast path.
   |
   |// Reconstruct previous base for vmeta_call during tailcall.
   |->vm_call_tail:
-  |  andi TMP0, PC, FRAME_TYPE
-  |   addi AT, zero, -4
-  |  and TMP1, PC, AT
-  |  bnez TMP0, >3
+  |  B_X
+  |    B_andi_x0 TMP0, PC, FRAME_TYPE
+  |    B_addi_x1 AT, zero, -4
+  |  B_X
+  |    B_and_x0 TMP1, PC, AT
+  |    B_bnez_x1 TMP0, >3
   |  addi TMP1, PC, OFS_RA
   |  ld1u TMP1, TMP1
   |  shli TMP1, TMP1, 3
   |  addli TMP1, TMP1, 8
   |3:
-  |  sub TMP2, BASE, TMP1
-  |  b ->vm_call_dispatch		// Resolve again for tailcall.
+  |  B_X
+  |    B_sub_x0 TMP2, BASE, TMP1
+  |    B_b_x1 ->vm_call_dispatch		// Resolve again for tailcall.
   |
   |5:  // Grow stack for fallback handler.
-  |  load_got lj_state_growstack
-  |  addi CARG2, zero, LUA_MINSTACK
-  |  move CARG1, L
+  |  B_X
+  |    //load_got lj_state_growstack
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_state_growstack)
+  |    B_addi_x1 CARG2, zero, LUA_MINSTACK
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
   |  call_intern lj_state_growstack	// (lua_State *L, int n)
   |  addlo BASE, L->base
-  |  ld BASE, BASE
-  |  move CRET1, zero			// Force retry.
+  |  B_X
+  |    B_move_x0 CRET1, zero			// Force retry.
+  |    B_ld_x1 BASE, BASE
   |  b <1
   |
   |->fff_gcstep:			// Call GC step function.
   |  // BASE = new base, RC = nargs*8
-  |  move MULTRES, lr
-  |  load_got lj_gc_step
-  |   addlo AT, L:LREG->base
-  |   st AT, BASE
-  |  add TMP0, BASE, NARGS8:RC
-  |   addi AT, sp, SAVE_PC
-  |   st AT, PC
-  |   addlo AT, L:LREG->top
-  |  st AT, TMP0
-  |  move CARG1, L
-  |  call_intern lj_gc_step		// (lua_State *L)
-  |   addlo BASE, L:LREG->base
-  |   ld BASE, BASE
-  |  move lr, MULTRES
-  |    addlo TMP0, L->top
-  |    ld TMP0, TMP0
-  |  addi CFUNC:RB, BASE, FRAME_FUNC
-  |  ld4s CFUNC:RB, CFUNC:RB
-  |  sub NARGS8:RC, TMP0, BASE
+  |  B_X
+  |    B_move_x0 MULTRES, lr
+  |    //load_got lj_gc_step
+  |    B_addli_x1 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_gc_step)
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->base
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_add_x0 TMP0, BASE, NARGS8:RC
+  |    B_st_x1 AT, BASE
+  |  addi AT, sp, SAVE_PC
+  |  B_X
+  |    B_addlo_x0 AT1, L:LREG->top
+  |    B_st_x1 AT, PC
+  |  st AT1, TMP0
+  |  B_X
+  |    B_move_x0 CARG1, L
+  |    //call_intern lj_gc_step		// (lua_State *L)
+  |    B_jalr_x1 CFUNCADDR
+  |  B_X
+  |    B_addlo_x0 BASE, L:LREG->base
+  |    B_addlo_x1 TMP0, L->top
+  |  B_X
+  |    B_move_x0 lr, MULTRES
+  |    B_ld_x1 BASE, BASE
+  |  B_X
+  |    B_addi_x0 CFUNC:RB, BASE, FRAME_FUNC
+  |    B_ld_x1 TMP0, TMP0
+  |  B_X
+  |    B_sub_x0 NARGS8:RC, TMP0, BASE
+  |    B_ld4s_x1 CFUNC:RB, CFUNC:RB
   |  jr lr
   |
   |//-----------------------------------------------------------------------
@@ -3475,17 +3508,21 @@ static void build_subroutines(BuildCtx *ctx)
   |.if JIT
   |  addli TMP3, DISPATCH, DISPATCH_GL(hookmask)
   |  ld1u TMP3, TMP3
-  |  andi AT, TMP3, HOOK_VMEVENT	// No recording while in vmevent.
-  |  // Decrement the hookcount for consistency, but always do the call.
-  |  addli TMP2, DISPATCH, DISPATCH_GL(hookcount)
+  |  B_X
+  |    B_andi_x0 AT, TMP3, HOOK_VMEVENT	// No recording while in vmevent.
+  |    // Decrement the hookcount for consistency, but always do the call.
+  |    B_addli_x1 TMP2, DISPATCH, DISPATCH_GL(hookcount)
   |  ld4u TMP2, TMP2
-  |  bnez AT, >5
-  |  andi AT, TMP3, HOOK_ACTIVE
-  |  addli TMP2, TMP2, -1
-  |  bnez AT, >1
+  |  B_X
+  |    B_andi_x0 AT, TMP3, HOOK_ACTIVE
+  |    B_bnez_x1 AT, >5
+  |  B_X
+  |    B_addli_x0 TMP2, TMP2, -1
+  |    B_bnez_x1 AT, >1
   |  andi AT, TMP3, LUA_MASKLINE|LUA_MASKCOUNT
-  |  beqz AT, >1
-  |  addli AT, DISPATCH, DISPATCH_GL(hookcount)
+  |  B_X
+  |    B_addli_x0 AT, DISPATCH, DISPATCH_GL(hookcount)
+  |    B_beqz_x1 AT, >1
   |  st4 AT, TMP2
   |  b >1
   |.endif
