@@ -2777,82 +2777,105 @@ static void build_subroutines(BuildCtx *ctx)
   |  mul_hu_lu CARG2, AT, AT1
   |  mul_lu_lu AT4, AT, AT1
   |  mula_hu_lu CARG2, AT1, AT
-  |  mul_hu_hu AT, AT, AT1
-  |  shli AT5, CARG2, 32
-  |  shrui CARG2, CARG2, 32
-  |  add AT4, AT4, AT5
-  |  add CARG2, AT, CARG2
-  |  cmpltu AT5, AT4, AT5
+  |  B_X
+  |    B_mul_hu_hu_x0 AT, AT, AT1
+  |    B_shli_x1 AT5, CARG2, 32
+  |  B_X
+  |    B_shrui_x0 CARG2, CARG2, 32
+  |    B_add_x1 AT4, AT4, AT5
+  |  B_X
+  |    B_add_x0 CARG2, AT, CARG2
+  |    B_cmpltu_x1 AT5, AT4, AT5
   |  add CARG2, CARG2, AT5
   |  fdouble_pack1 CARG1, CARG2, CARG1
-  |  fdouble_pack2 CARG1, CARG2, AT4 // CARG1 is the same as CRET1
-  |  b ->fff_resn
+  |  B_X
+  |    B_fdouble_pack2_x0 CARG1, CARG2, AT4 // CARG1 is the same as CRET1
+  |    B_b_x1 ->fff_resn
   |
   |.ffunc_nn math_ldexp
-  |  move CROSSTMP1, CARG1
-  |  move CARG1, CARG2 
-  |  load_got __fixdfsi
-  |  call_extern
-  |  move CARG2, CRET1
-  |  move CARG1, CROSSTMP1
+  |  fixdfsi_inline CARG2, AT, AT1, AT2, AT3
   |  load_got ldexp
   |  call_extern
   |  b ->fff_resn
   |
   |.ffunc_n math_frexp
-  |  load_got frexp
-  |   addi PC, BASE, FRAME_PC
-  |   ld4s PC, PC
-  |  addli CARG2, DISPATCH, DISPATCH_GL(tmptv)
+  |  //load_got frexp
+  |  B_X
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(frexp)
+  |    B_addi_x1 PC, BASE, FRAME_PC
+  |  B_X
+  |    B_addli_x0 CARG2, DISPATCH, DISPATCH_GL(tmptv)
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
+  |  ld4s PC, PC
   |  call_extern
-  |   addli TMP1, DISPATCH, DISPATCH_GL(tmptv)
-  |   ld TMP1, TMP1
-  |  addli RA, BASE, -8
-  |  st RA, CRET1
-  |   cmpltsi AT, TMP1, 0
-  |   sub AT1, zero, TMP1
-  |   moveli AT2, 539
-  |   cmovnez TMP1, AT, AT1
-  |   shli AT2, AT2, 8
-  |   shli AT1, TMP1, 4
-  |   bfins AT2, AT, 20, 20
-  |   fdouble_pack1 TMP1, AT1, AT2
-  |   fdouble_pack2 TMP1, AT1, zero
-  |   addi AT, RA, 8
-  |   st AT, TMP1
-  |  addi RD, zero, (2+1)*8
-  |  b ->fff_res
+  |  addli TMP1, DISPATCH, DISPATCH_GL(tmptv)
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_ld_x1 TMP1, TMP1
+  |  B_X
+  |    B_cmpltsi_x0 AT, TMP1, 0
+  |    B_st_x1 RA, CRET1
+  |  B_X
+  |    B_sub_x0 AT1, zero, TMP1
+  |    B_moveli_x1 AT2, 539
+  |  B_X
+  |    B_cmovnez_x0 TMP1, AT, AT1
+  |    B_shli_x1 AT2, AT2, 8
+  |  B_X
+  |    B_bfins_x0 AT2, AT, 20, 20
+  |    B_shli_x1 AT1, TMP1, 4
+  |  fdouble_pack1 TMP1, AT1, AT2
+  |  B_X
+  |    B_fdouble_pack2_x0 TMP1, AT1, zero
+  |    B_addi_x1 AT, RA, 8
+  |  st AT, TMP1
+  |  B_X
+  |    B_addi_x0 RD, zero, (2+1)*8
+  |    B_b_x1 ->fff_res
   |
   |.ffunc_n math_modf
-  |  load_got modf
-  |   addi PC, BASE, FRAME_PC
-  |   ld4s PC, PC
-  |  addli CARG2, BASE, -8
+  |  B_X
+  |    //load_got modf
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(modf)
+  |    B_addi_x1 PC, BASE, FRAME_PC
+  |  ld CFUNCADDR, CFUNCADDR
+  |  B_X
+  |    B_addli_x0 CARG2, BASE, -8
+  |    B_ld4s_x1 PC, PC
   |  call_extern
-  |  addli RA, BASE, -8
-  |  st BASE, CRET1
-  |  addi RD, zero, (2+1)*8
-  |  b ->fff_res
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_st_x1 BASE, CRET1
+  |  B_X
+  |    B_addi_x0 RD, zero, (2+1)*8
+  |    B_b_x1 ->fff_res
   |
   |.macro math_minmax, name, ismax
   |->ff_ .. name:
-  |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |  ld CRET1, BASE
-  |  beqz NARGS8:RC, ->fff_fallback
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu AT, CARG3, AT
-  |  add TMP2, BASE, NARGS8:RC
-  |  beqz AT, ->fff_fallback
-  |  addli TMP1, BASE, 8
+  |  B_X
+  |    B_addi_x0 CARG3, BASE, HI
+  |    B_ld_x1 CRET1, BASE
+  |  B_X
+  |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_ld4s_x1 CARG3, CARG3
+  |  B_X
+  |    B_shl16insli_x0 AT, AT, (short)(LJ_TISNUM & 0xFFFF)
+  |    B_beqz_x1 NARGS8:RC, ->fff_fallback
+  |  B_X
+  |    B_cmpltu_x0 AT, CARG3, AT
+  |    B_add_x1 TMP2, BASE, NARGS8:RC
+  |  B_X
+  |    B_addli_x0 TMP1, BASE, 8
+  |    B_beqz_x1 AT, ->fff_fallback
   |  cmpeq AT, TMP1, TMP2
   |  bnez AT, ->fff_resn
   |1:
-  |  addi CARG3, TMP1, HI
-  |  ld4s CARG3, CARG3
-  |  ld CARG2, TMP1
-  |   addli TMP1, TMP1, 8
+  |  B_X
+  |    B_addi_x0 CARG3, TMP1, HI
+  |    B_ld_x1 CARG2, TMP1
+  |  B_X
+  |    B_addli_x0 TMP1, TMP1, 8
+  |    B_ld4s_x1 CARG3, CARG3
   |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
   |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
   |  cmpltu AT, CARG3, AT
@@ -3205,9 +3228,13 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Table library ------------------------------------------------------
   |
   |.ffunc_1 table_getn
-  |  addi AT, zero, LJ_TTAB
-  |  load_got lj_tab_len
-  |  cmpne AT, CARG3, AT
+  |  B_X
+  |    B_addi_x0 AT, zero, LJ_TTAB
+  |    //load_got lj_tab_len
+  |    B_addli_x1 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_tab_len)
+  |  B_X
+  |    B_cmpne_x0 AT, CARG3, AT
+  |    B_ld_x1 CFUNCADDR, CFUNCADDR
   |  bnez AT, ->fff_fallback
   |  call_intern lj_tab_len		// (GCtab *t)
   |  // Returns uint32_t (but less than 2^31).
@@ -3233,17 +3260,20 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.macro .ffunc_bit_op, name, ins
   |  .ffunc_bit name
-  |  addli TMP1, BASE, 8
-  |  add TMP2, BASE, NARGS8:RC
+  |  B_X
+  |    B_addli_x0 TMP1, BASE, 8
+  |    B_add_x1 TMP2, BASE, NARGS8:RC
   |1:
   |  addi CARG4, TMP1, HI
   |  ld4s CARG4, CARG4
-  |  ld CARG1, TMP1
-  |  cmpeq AT, TMP1, TMP2
+  |  B_X
+  |    B_moveli_x0 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_ld_x1 CARG1, TMP1
+  |  B_X
+  |    B_cmpeq_x0 AT, TMP1, TMP2
+  |    B_shl16insli_x1 AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
   |  bnez AT, ->fff_resi
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu AT, CARG4, AT
+  |  cmpltu AT, CARG4, AT1
   |  beqz AT, ->fff_fallback
   |  //add.d FARG1, FARG1, TOBIT
   |  //mfc1 CARG2, FARG1
@@ -3338,12 +3368,15 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_bit tobit
   |  move CRET1, AT5
   |->fff_resi:
-  |  cmpltsi AT, CRET1, 0
-  |  sub AT1, zero, CRET1
-  |  moveli AT2, 539
-  |  cmovnez CRET1, AT, AT1
-  |  shli AT2, AT2, 8
-  |  shli AT1, CRET1, 4
+  |  B_X
+  |    B_cmpltsi_x0 AT, CRET1, 0
+  |    B_sub_x1 AT1, zero, CRET1
+  |  B_X
+  |    B_cmovnez_x0 CRET1, AT, AT1
+  |    B_moveli_x1 AT2, 539
+  |  B_X
+  |    B_shli_x0 AT2, AT2, 8
+  |    B_shli_x1 AT1, CRET1, 4
   |  bfins AT2, AT, 20, 20
   |  fdouble_pack1 CRET1, AT1, AT2
   |  fdouble_pack2 CRET1, AT1, zero
