@@ -391,6 +391,7 @@ local map_op = {
   B_bfins_x0_4 =	"360000001DAGH",
   B_cmoveqz_x0_3 =	"501400001DAB",
   B_cmovnez_x0_3 =	"501800001DAB",
+  B_revbytes_x0_2 =	"514880001DA",
 
   -- Memory Instructions.
   B_st_x1_2 =		"50C400002AB",

@@ -28,7 +28,7 @@
 |//                     r36     // not used.
 |.define RA,		r37	// RA need to be callee-save.
 |.define CROSSTMP1,	r38	// TMP used to hold variable which need to be alive across C call.
-|.define CROSSTMP2,	r39
+|.define TOBIT,		r39
 |.define ASMENTRY,	r45
 |
 |.define JGL,		r52	// On-trace: global_State + 32768.
@@ -261,6 +261,12 @@
 |.macro cmoveqz, a, b, c
 |  B_X
 |    B_cmoveqz_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
+|.macro revbytes, a, b
+|  B_X
+|    B_revbytes_x0 a, b
 |    B_fnop_x1
 |.endmacro
 |
@@ -1028,11 +1034,15 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi AT, zero, -4
   |  and sp, CARG1, AT
   |->vm_unwind_ff_eh:			// Landing pad for external unwinder.
-  |  addli L, sp, SAVE_L
+  |  B_X
+  |    B_addli_x0 L, sp, SAVE_L
+  |    B_moveli_x1 TOBIT, 14403
   |  B_X
   |    B_addi_x0 TISNIL, zero, LJ_TNIL
   |    B_ld_x1 L, L
-  |  addlo BASE, L:LREG->base
+  |  B_X
+  |    B_revbytes_x0 TOBIT, TOBIT
+  |    B_addlo_x1 BASE, L:LREG->base
   |  B_X
   |    B_addlo_x0 DISPATCH, L:LREG->glref		// Setup pointer to dispatch table.
   |    B_ld_x1 BASE, BASE
@@ -1172,7 +1182,9 @@ static void build_subroutines(BuildCtx *ctx)
   |  B_X
   |    B_sub_x0 RD, TMP1, BASE
   |    B_ld4s_x1 PC, PC
-  |  addlo AT, L:LREG->status
+  |  B_X
+  |    B_addlo_x0 AT, L:LREG->status
+  |    B_moveli_x1 TOBIT, 14403
   |  B_X
   |    //li_vmstate INTERP
   |    B_moveli_x0 TMP0, ~LJ_VMST_INTERP
@@ -1187,7 +1199,9 @@ static void build_subroutines(BuildCtx *ctx)
   |  B_X
   |    B_andi_x0 TMP0, PC, FRAME_TYPE
   |    B_addi_x1 TISNIL, zero, LJ_TNIL
-  |  beqz TMP0, ->BC_RET_Z
+  |  B_X
+  |    B_revbytes_x0 TOBIT, TOBIT
+  |    B_beqz_x1 TMP0, ->BC_RET_Z
   |  b ->vm_return
   |
   |->vm_pcall:				// Setup protected C frame and enter VM.
@@ -1247,7 +1261,9 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_st_x1 AT1, TMP1
   |
   |3:  // Entry point for vm_cpcall/vm_resume (BASE = base, PC = ftype).
-  |  addlo TMP2, L:LREG->base		
+  |  B_X
+  |    B_addlo_x0 TMP2, L:LREG->base		
+  |    B_moveli_x1 TOBIT, 14403
   |  B_X
   |    B_addlo_x0 TMP1, L:LREG->top		
   |    B_ld_x1 TMP2, TMP2			// TMP2 = old base (used in vmeta_call).
@@ -1261,7 +1277,11 @@ static void build_subroutines(BuildCtx *ctx)
   |    //li_vmstate INTERP
   |    B_moveli_x0 TMP0, ~LJ_VMST_INTERP
   |    B_moveli_x1 TISNIL, LJ_TNIL
-  |  st_vmstate
+  |  B_X
+  |    B_revbytes_x0 TOBIT, TOBIT
+  |    //st_vmstate
+  |    B_addli_x1 AT, DISPATCH, DISPATCH_GL(vmstate)
+  |  st4 AT, TMP0
   |
   |->vm_call_dispatch:
   |  // TMP2 = old base, BASE = new base, RC = nargs*8, PC = caller PC
@@ -3092,11 +3112,11 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_addi_x0 AT2, BASE, 8
   |    B_or_x1 AT, AT, TMP0
   |  B_X
-  |    B_moveli_x0 CROSSTMP2, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_moveli_x0 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
   |    B_ld_x1 AT2, AT2
-  |  shl16insli CROSSTMP2, CROSSTMP2, (short)(LJ_TISNUM & 0xFFFF)
+  |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
   |  B_X
-  |    B_cmpltu_x0 CROSSTMP2, CARG4, CROSSTMP2
+  |    B_cmpltu_x0 AT1, CARG4, AT1
   |    B_bnez_x1 AT, ->fff_fallback
   |  //cvt.w.d f0, f0
   |  fixdfsi_inline AT2, AT3, AT4, AT5, AT6
@@ -3106,7 +3126,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  ld4u TMP0, TMP0
   |  B_X
   |    B_addli_x0 TMP1, DISPATCH, DISPATCH_GL(tmpbuf.sz)
-  |    B_beqz_x1 CROSSTMP2, ->fff_fallback
+  |    B_beqz_x1 AT1, ->fff_fallback
   |  B_X
   |    B_addi_x0 AT, zero, 1
   |    B_ld4u_x1 TMP1, TMP1
@@ -3243,16 +3263,33 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Bit library --------------------------------------------------------
   |
   |.macro .ffunc_bit, name
-  |  .ffunc_n bit_..name
-  |  moveli AT, 17208 // 0x4338
-  |  shl16insli AT, AT, 0
-  |  shl16insli AT, AT, 0
-  |  shl16insli AT, AT, 0
+  |->ff_bit_..name:
+  |  B_Y2
+  |    B_addi_y0 CARG3, BASE, HI
+  |    B_move_y1 AT, TOBIT
+  |    B_ld_y2 CARG1, BASE
+  |  B_X
+  |    B_fdouble_add_flags_x0  AT1, CARG1, AT
+  |    B_ld4s_x1 CARG3, CARG3
+  |  B_X
+  |    B_moveli_x0 AT3, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_beqz_x1 NARGS8:RC, ->fff_fallback
+  |  B_X
+  |    B_fdouble_unpack_min_x0 AT2, CARG1, AT
+  |    B_shl16insli_x1 AT3, AT3, (short)(LJ_TISNUM & 0xFFFF)
+  |  B_X
+  |    B_fdouble_unpack_max_x0 AT,  CARG1, AT
+  |    B_cmpltu_x1 AT3, CARG3, AT3
+  |.if "name" == "math_abs"
+  |  bfextu  CRET1, CARG1, 0, 62
+  |.elif "name" == "math_rad"
+  |  addlo CARG2, CFUNC:RB->upvalue[0]
+  |  ld CARG2, CARG2
+  |.endif
+  |  B_X
+  |    B_fdouble_addsub_x0 AT, AT2, AT1
+  |    B_beqz_x1 AT3, ->fff_fallback
   |  //add.d FARG1, FARG1, TOBIT
-  |  fdouble_add_flags  AT1, CARG1, AT
-  |  fdouble_unpack_min AT2, CARG1, AT
-  |  fdouble_unpack_max AT,  CARG1, AT
-  |  fdouble_addsub AT, AT2, AT1
   |  fdouble_pack1 CARG1, AT, AT1
   |  fdouble_pack2 CARG1, AT, zero
   |  bfexts AT5, CARG1, 0, 31
@@ -3264,33 +3301,36 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_addli_x0 TMP1, BASE, 8
   |    B_add_x1 TMP2, BASE, NARGS8:RC
   |1:
-  |  addi CARG4, TMP1, HI
-  |  ld4s CARG4, CARG4
   |  B_X
-  |    B_moveli_x0 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_addi_x0 CARG4, TMP1, HI
+  |    B_move_x1 AT, TOBIT
+  |  B_X
+  |    B_fdouble_add_flags_x0  AT1, CARG1, AT
+  |    B_ld4s_x1 CARG4, CARG4
+  |  B_X
+  |    B_moveli_x0 AT3, (short)((LJ_TISNUM >> 16) & 0xFFFF)
   |    B_ld_x1 CARG1, TMP1
   |  B_X
-  |    B_cmpeq_x0 AT, TMP1, TMP2
-  |    B_shl16insli_x1 AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
-  |  bnez AT, ->fff_resi
-  |  cmpltu AT, CARG4, AT1
-  |  beqz AT, ->fff_fallback
+  |    B_cmpeq_x0 AT4, TMP1, TMP2
+  |    B_shl16insli_x1 AT3, AT3, (short)(LJ_TISNUM & 0xFFFF)
+  |  B_X
+  |    B_fdouble_unpack_min_x0 AT2, CARG1, AT
+  |    B_bnez_x1 AT4, ->fff_resi
+  |  B_X
+  |    B_fdouble_unpack_max_x0 AT,  CARG1, AT
+  |    B_cmpltu_x1 AT4, CARG4, AT3
+  |  B_X
+  |    B_fdouble_addsub_x0 AT, AT2, AT1
+  |    B_beqz_x1 AT4, ->fff_fallback
   |  //add.d FARG1, FARG1, TOBIT
   |  //mfc1 CARG2, FARG1
-  |  moveli AT, 17208 // 0x4338
-  |  shl16insli AT, AT, 0
-  |  shl16insli AT, AT, 0
-  |  shl16insli AT, AT, 0
-  |  fdouble_add_flags  AT1, CARG1, AT
-  |  fdouble_unpack_min AT2, CARG1, AT
-  |  fdouble_unpack_max AT,  CARG1, AT
-  |  fdouble_addsub AT, AT2, AT1
   |  fdouble_pack1 CARG1, AT, AT1
   |  fdouble_pack2 CARG1, AT, zero
   |  bfexts CARG2, CARG1, 0, 31
   |  ins CRET1, AT5, CARG2
-  |  addli TMP1, TMP1, 8
-  |  b <1
+  |  B_X
+  |    B_addli_x0 TMP1, TMP1, 8
+  |    B_b_x1 <1
   |.endmacro
   |
   |.ffunc_bit_op band, and
@@ -3298,50 +3338,59 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_bit_op bxor, xor
   |
   |.ffunc_bit bswap
-  |  shrui TMP0, AT5, 24
-  |   shrui TMP2, AT5, 8
-  |  shli TMP1, AT5, 24
-  |   moveli AT, 255
-  |   shli AT, AT, 8
-  |   and TMP2, TMP2, AT
-  |  or TMP0, TMP0, TMP1
-  |   and AT5, AT5, AT
-  |  or TMP0, TMP0, TMP2
-  |   shli AT5, AT5, 8
-  |  or CRET1, TMP0, AT5
-  |  b ->fff_resi
+  |  revbytes CRET1, AT5
+  |  B_X
+  |    B_shrsi_x0 CRET1, CRET1, 32
+  |    B_b_x1 ->fff_resi
   |
   |.ffunc_bit bnot
-  |  nor CRET1, AT5, zero
-  |  b ->fff_resi
+  |  B_X
+  |    B_nor_x0 CRET1, AT5, zero
+  |    B_b_x1 ->fff_resi
   |
   |.macro .ffunc_bit_sh, name, ins, shmod
-  |  .ffunc_nn bit_..name
-  |  //add.d FARG1, FARG1, TOBIT
-  |  moveli AT, 17208 // 0x4338
-  |  shl16insli AT, AT, 0
-  |  shl16insli AT, AT, 0
-  |  shl16insli AT, AT, 0
-  |  fdouble_add_flags  AT1, CARG1, AT
-  |  fdouble_unpack_min AT2, CARG1, AT
-  |  fdouble_unpack_max AT,  CARG1, AT
-  |  fdouble_addsub AT, AT2, AT1
+  |->ff_bit_..name:
+  |  B_X
+  |    B_cmpltui_x0 AT6, NARGS8:RC, 16
+  |    B_addi_x1 CARG3, BASE, HI
+  |  B_X
+  |    B_addi_x0 CARG4, BASE, 8+HI
+  |    B_ld_x1 CARG1, BASE
+  |  B_X
+  |    B_move_x0 AT, TOBIT
+  |    B_ld4s_x1 CARG4, CARG4
+  |  B_X
+  |    B_fdouble_add_flags_x0 AT1, CARG1, AT
+  |    B_bnez_x1 AT6, ->fff_fallback
+  |  B_X
+  |    B_addi_x0 AT3, BASE, 8
+  |    B_ld4s_x1 CARG3, CARG3
+  |  B_X
+  |    B_moveli_x0 AT6, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+  |    B_ld_x1 CARG2, AT3
+  |  B_X
+  |    B_fdouble_unpack_min_x0 AT2, CARG1, AT
+  |    B_shl16insli_x1 AT6, AT6, (short)(LJ_TISNUM & 0xFFFF)
+  |  B_X
+  |    B_cmpltu_x0 TMP0, CARG3, AT6
+  |    B_cmpltu_x1 TMP1, CARG4, AT6
+  |  B_X
+  |    B_fdouble_unpack_max_x0 AT,  CARG1, AT
+  |    B_and_x1 TMP0, TMP0, TMP1
+  |  B_X
+  |    B_fdouble_addsub_x0 AT, AT2, AT1
+  |    B_beqz_x1 TMP0, ->fff_fallback
   |  fdouble_pack1 CARG1, AT, AT1
   |  fdouble_pack2 CARG1, AT, zero
-  |  //mfc1 CARG1, FARG1
-  |  bfexts AT5, CARG1, 0, 31
-  |  //add.d FARG2, FARG2, TOBIT
-  |  moveli AT, 17208 // 0x4338
-  |  shl16insli AT, AT, 0
-  |  shl16insli AT, AT, 0
-  |  shl16insli AT, AT, 0
+  |  B_X
+  |    B_bfexts_x0 AT5, CARG1, 0, 31
+  |    B_move_x1 AT, TOBIT
   |  fdouble_add_flags  AT1, CARG2, AT
   |  fdouble_unpack_min AT2, CARG2, AT
   |  fdouble_unpack_max AT,  CARG2, AT
   |  fdouble_addsub AT, AT2, AT1
   |  fdouble_pack1 CARG2, AT, AT1
   |  fdouble_pack2 CARG2, AT, zero
-  |  //mfc1 CARG2, FARG2
   |  bfexts AT4, CARG2, 0, 31
   |.if shmod == 1
   |  addi AT, zero, 32
@@ -3354,16 +3403,17 @@ static void build_subroutines(BuildCtx *ctx)
   |  shru CARG2, CARG1, CARG2
   |  shl CARG1, CARG1, TMP0
   |.endif
-  |  ins CRET1, AT5, AT4
-  |  b ->fff_resi
+  |  B_X
+  |    ins CRET1, AT5, AT4
+  |    B_b_x1 ->fff_resi
   |.endmacro
   |
-  |.ffunc_bit_sh lshift, shl, 0
-  |.ffunc_bit_sh rshift, shru, 0
-  |.ffunc_bit_sh arshift, shrs, 0
+  |.ffunc_bit_sh lshift, B_shl_x0, 0
+  |.ffunc_bit_sh rshift, B_shru_x0, 0
+  |.ffunc_bit_sh arshift, B_shrs_x0, 0
   |// Can't use rotrv, since it's only in MIPS32R2.
-  |.ffunc_bit_sh rol, or, 1
-  |.ffunc_bit_sh ror, or, 2
+  |.ffunc_bit_sh rol, B_or_x0, 1
+  |.ffunc_bit_sh ror, B_or_x0, 2
   |
   |.ffunc_bit tobit
   |  move CRET1, AT5
@@ -3729,19 +3779,18 @@ static void build_subroutines(BuildCtx *ctx)
   |  addi LFUNC:TMP1, BASE, FRAME_FUNC
   |  ld4s LFUNC:TMP1, LFUNC:TMP1
   |  bltz CRET1, >3			// Check for error from exit.
-  |    //lui TMP3, 0x59c0			// TOBIT = 2^52 + 2^51 (float).
+  |  moveli TOBIT, 14403
+  |  revbytes TOBIT, TOBIT
   |  shli MULTRES, CRET1, 3
   |    addi TISNIL, zero, LJ_TNIL
   |   addi AT, sp, SAVE_MULTRES
   |  st AT, MULTRES
-  |    //mtc1 TMP3, TOBIT
   |  addlo TMP1, LFUNC:TMP1->pc
   |  ld4u TMP1, TMP1
   |   addli AT, DISPATCH, DISPATCH_GL(jit_L)
   |   st4 AT, zero
   |  addi KBASE, TMP1, PC2PROTO(k)
   |  ld4u KBASE, KBASE
-  |    //cvt.d.s TOBIT, TOBIT
   |  // Modified copy of ins_next which handles function header dispatch, too.
   |  ld INS, PC
   |   addli PC, PC, 4
@@ -3870,15 +3919,14 @@ static void build_subroutines(BuildCtx *ctx)
   |  addlo RC, L:CRET1->top
   |  ld RC, RC
   |   move L, CRET1
-  |     //lui TMP3, 0x59c0		// TOBIT = 2^52 + 2^51 (float).
+  |    moveli TOBIT, 14403
+  |    revbytes TOBIT, TOBIT
   |  addi LFUNC:RB, BASE, FRAME_FUNC
   |  ld4s LFUNC:RB, LFUNC:RB
-  |     //mtc1 TMP3, TOBIT
   |    li_vmstate INTERP
   |     addi TISNIL, zero, LJ_TNIL
   |  sub RC, RC, BASE
   |    st_vmstate
-  |     //cvt.d.s TOBIT, TOBIT
   |  ins_callt
   |.endif
   |
