@@ -84,6 +84,12 @@
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
 |
+|.macro rotl, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_rotl_x1 a, b, c
+|.endmacro
+|
 |.macro add, a, b, c
 |  B_X
 |    B_fnop_x0
@@ -196,6 +202,12 @@
 |  B_X
 |    B_fnop_x0
 |    B_shl_x1 a, b, c
+|.endmacro
+|
+|.macro shlx, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_shlx_x1 a, b, c
 |.endmacro
 |
 |.macro shli, a, b, c
@@ -3393,26 +3405,32 @@ static void build_subroutines(BuildCtx *ctx)
   |  fdouble_pack2 CARG2, AT, zero
   |  bfexts AT4, CARG2, 0, 31
   |.if shmod == 1
-  |  addi AT, zero, 32
-  |  sub TMP0, AT, CARG2
-  |  shl CARG2, CARG1, CARG2
-  |  shru CARG1, CARG1, TMP0
+  |  ins CRET1, AT5, AT4
+  |  bfexts AT, CRET1, 32, 63
+  |  bfexts CRET1, CRET1, 0, 31
+  |  B_X
+  |    B_or_x0 CRET1, CRET1, AT
+  |    B_b_x1 ->fff_resi
   |.elif shmod == 2
   |  addi AT, zero, 32
-  |  sub TMP0, AT, CARG2
-  |  shru CARG2, CARG1, CARG2
-  |  shl CARG1, CARG1, TMP0
-  |.endif
+  |  sub TMP0, AT, AT4
+  |  shru AT4, AT5, AT4
+  |  shlx AT5, AT5, TMP0
   |  B_X
   |    ins CRET1, AT5, AT4
   |    B_b_x1 ->fff_resi
+  |.else
+  |  B_X
+  |    ins CRET1, AT5, AT4
+  |    B_b_x1 ->fff_resi
+  |.endif
   |.endmacro
   |
   |.ffunc_bit_sh lshift, B_shl_x0, 0
   |.ffunc_bit_sh rshift, B_shru_x0, 0
   |.ffunc_bit_sh arshift, B_shrs_x0, 0
   |// Can't use rotrv, since it's only in MIPS32R2.
-  |.ffunc_bit_sh rol, B_or_x0, 1
+  |.ffunc_bit_sh rol, rotl, 1
   |.ffunc_bit_sh ror, B_or_x0, 2
   |
   |.ffunc_bit tobit

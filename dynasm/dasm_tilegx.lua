@@ -372,6 +372,8 @@ local map_op = {
   B_ori_x1_3 =		"318000002DAE",
   B_shl_x0_3 =		"512800001DAB",
   B_shl_x1_3 =		"509800002DAB",
+  B_shlx_x0_3 =		"512400001DAB",
+  B_shlx_x1_3 =		"509400002DAB",
   B_shli_x0_3 =		"600800001DAe",
   B_shli_x1_3 =		"600800002DAE",
   B_shli_y0_3 =		"00F400004DAe",
@@ -392,6 +394,8 @@ local map_op = {
   B_cmoveqz_x0_3 =	"501400001DAB",
   B_cmovnez_x0_3 =	"501800001DAB",
   B_revbytes_x0_2 =	"514880001DA",
+  B_rotl_x0_3 =		"510800001DAB",
+  B_rotl_x1_3 =		"507800001DAB",
 
   -- Memory Instructions.
   B_st_x1_2 =		"50C400002AB",
