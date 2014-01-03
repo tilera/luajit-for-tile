@@ -3018,12 +3018,12 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_move_x0 CARG1, L
   |    B_st_x1 AT1, PC
   |  B_X
-  |    B_addlo_x0 AT1, L->base
+  |    B_addlo_x0 CROSSTMP1, L->base
   |    //call_intern lj_str_new		// (lua_State *L, char *str, size_t l)
   |    B_jalr_x1 CFUNCADDR
   |  B_X
   |    B_move_x0 CARG1, CRET1
-  |    B_ld_x1 BASE, AT1
+  |    B_ld_x1 BASE, CROSSTMP1
   |  B_X
   |    B_addi_x0 CARG3, zero, LJ_TSTR
   |    B_b_x1 ->fff_restv
