@@ -229,7 +229,7 @@ void emit_asm(BuildCtx *ctx)
 
   fprintf(ctx->fp, "\t.file \"buildvm_%s.dasc\"\n", ctx->dasm_arch);
   fprintf(ctx->fp, "\t.text\n");
-  emit_asm_align(ctx, 4);
+  emit_asm_align(ctx, 3);
 
 #if LJ_TARGET_PS3
   emit_asm_label(ctx, ctx->beginsym, ctx->codesz, 0);

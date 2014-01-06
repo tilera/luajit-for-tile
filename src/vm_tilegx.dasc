@@ -4261,10 +4261,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_shl16insli_x0 AT, AT, (short)(LJ_TISNUM & 0xFFFF)
     |    B_ld2u_x1 TMP2, TMP2
-    |  B_X
-    |    B_cmpltu_x0 AT, TMP0, AT
-    |    B_ld_x1 AT3, RD
-    |  decode_RD4b TMP2
+    |  B_Y2
+    |    B_cmpltu_y0 AT, TMP0, AT
+    |    //decode_RD4b TMP2
+    |    B_shli_y1 TMP2, TMP2, 2
+    |    B_ld_y2 AT3, RD
     |.if FFI
     |  B_X
     |    B_add_x0 TMP2, TMP2, TMP3
@@ -4833,13 +4834,29 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_addlo_x0 UPVAL:RB, LFUNC:RD->uvptr
     |    // ins_next1
     |    B_ld4u_add_x1 INS, PC, 4
-    |  ld4u UPVAL:RB, UPVAL:RB
-    |  addlo TMP1, UPVAL:RB->v
-    |  ld4u TMP1, TMP1
-    |  ld AT2, TMP1
-    |  add RA, BASE, RA
+    |  B_X
+    |    B_bfextu_x0 TMP1, INS, 0, 7
+    |    B_ld4u_x1 UPVAL:RB, UPVAL:RB
+    |  B_X
+    |    B_shli_x0 TMP1, TMP1, 3
+    |    B_addlo_x1 AT1, UPVAL:RB->v
+    |  B_Y2
+    |    B_add_y0 TMP0, DISPATCH, TMP1
+    |    B_shrui_y1 RD, INS, 16
+    |    B_ld4u_y2 AT1, AT1
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_ld_x1 AT2, AT1
     |  st RA, AT2
-    |  ins_next2
+    |  B_X
+    |    B_shrui_x0, RA, INS, 5
+    |    B_ld_x1, AT, TMP0
+    |  B_X
+    |    B_bfextu_x0, RA, RA, 3, 10
+    |    B_shli_x1, RD, RD, 3
+    |  B_X
+    |    B_shli_x0, RA, RA, 3
+    |    B_jr_x1, AT
     break;
   case BC_USETV:
     |  // RA = uvnum*8, RD = src*8
@@ -6822,56 +6839,9 @@ static int build_backend(BuildCtx *ctx)
 /* Emit pseudo frame-info for all assembler functions. */
 static void emit_asm_debug(BuildCtx *ctx)
 {
-  int fcofs = (int)((uint8_t *)ctx->glob[GLOB_vm_ffi_call] - ctx->code);
-  int i;
+  int fcofs = ctx->bc_ofs[BC_FUNCCW];
   switch (ctx->mode) {
   case BUILD_elfasm:
-    fprintf(ctx->fp, "\t.section .debug_frame,\"\",@progbits\n");
-    fprintf(ctx->fp,
-	".Lframe0:\n"
-	"\t.4byte .LECIE0-.LSCIE0\n"
-	".LSCIE0:\n"
-	"\t.4byte 0xffffffff\n"
-	"\t.byte 0x1\n"
-	"\t.string \"\"\n"
-	"\t.uleb128 0x1\n"
-	"\t.sleb128 -4\n"
-	"\t.byte 31\n"
-	"\t.byte 0xc\n\t.uleb128 29\n\t.uleb128 0\n"
-	"\t.align 2\n"
-	".LECIE0:\n\n");
-    fprintf(ctx->fp,
-	".LSFDE0:\n"
-	"\t.4byte .LEFDE0-.LASFDE0\n"
-	".LASFDE0:\n"
-	"\t.4byte .Lframe0\n"
-	"\t.4byte .Lbegin\n"
-	"\t.4byte %d\n"
-	"\t.byte 0xe\n\t.uleb128 %d\n"
-	"\t.byte 0x9f\n\t.sleb128 1\n"
-	"\t.byte 0x9e\n\t.sleb128 2\n",
-	fcofs, CFRAME_SIZE);
-    for (i = 23; i >= 16; i--)
-      fprintf(ctx->fp, "\t.byte %d\n\t.uleb128 %d\n", 0x80+i, 26-i);
-    for (i = 30; i >= 20; i -= 2)
-      fprintf(ctx->fp, "\t.byte %d\n\t.uleb128 %d\n", 0x80+32+i, 42-i);
-    fprintf(ctx->fp,
-	"\t.align 2\n"
-	".LEFDE0:\n\n");
-#if LJ_HASFFI
-    fprintf(ctx->fp,
-	".LSFDE1:\n"
-	"\t.4byte .LEFDE1-.LASFDE1\n"
-	".LASFDE1:\n"
-	"\t.4byte .Lframe0\n"
-	"\t.4byte lj_vm_ffi_call\n"
-	"\t.4byte %d\n"
-	"\t.byte 0x9f\n\t.uleb128 1\n"
-	"\t.byte 0x90\n\t.uleb128 2\n"
-	"\t.byte 0xd\n\t.uleb128 0x10\n"
-	"\t.align 2\n"
-	".LEFDE1:\n\n", (int)ctx->codesz - fcofs);
-#endif
     fprintf(ctx->fp, "\t.section .eh_frame,\"aw\",@progbits\n");
     fprintf(ctx->fp,
 	"\t.globl lj_err_unwind_dwarf\n"
@@ -6882,33 +6852,29 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.byte 0x1\n"
 	"\t.string \"zPR\"\n"
 	"\t.uleb128 0x1\n"
-	"\t.sleb128 -4\n"
-	"\t.byte 31\n"
-	"\t.uleb128 6\n"			/* augmentation length */
+	"\t.sleb128 -8\n"
+	"\t.byte 0x37\n"
+	"\t.uleb128 10\n"			/* augmentation length */
 	"\t.byte 0\n"
-	"\t.4byte lj_err_unwind_dwarf\n"
-	"\t.byte 0\n"
-	"\t.byte 0xc\n\t.uleb128 29\n\t.uleb128 0\n"
-	"\t.align 2\n"
+	"\t.8byte lj_err_unwind_dwarf\n"
+	"\t.byte 0x1c\n"
+	"\t.byte 0xc\n\t.uleb128 0x36\n\t.uleb128 0\n"
+	"\t.align 8\n"
 	".LECIE1:\n\n");
     fprintf(ctx->fp,
 	".LSFDE2:\n"
 	"\t.4byte .LEFDE2-.LASFDE2\n"
 	".LASFDE2:\n"
 	"\t.4byte .LASFDE2-.Lframe1\n"
-	"\t.4byte .Lbegin\n"
-	"\t.4byte %d\n"
+	"\t.8byte .Lbegin\n"
+	"\t.8byte %d\n"
 	"\t.uleb128 0\n"			/* augmentation length */
 	"\t.byte 0xe\n\t.uleb128 %d\n"
-	"\t.byte 0x9f\n\t.sleb128 1\n"
-	"\t.byte 0x9e\n\t.sleb128 2\n",
+	"\t.byte 0xb7\n\t.sleb128 13\n"   /* lr */
+	"\t.byte 0xb4\n\t.sleb128 12\n",  /* fp */
 	fcofs, CFRAME_SIZE);
-    for (i = 23; i >= 16; i--)
-      fprintf(ctx->fp, "\t.byte %d\n\t.uleb128 %d\n", 0x80+i, 26-i);
-    for (i = 30; i >= 20; i -= 2)
-      fprintf(ctx->fp, "\t.byte %d\n\t.uleb128 %d\n", 0x80+32+i, 42-i);
     fprintf(ctx->fp,
-	"\t.align 2\n"
+	"\t.align 8\n"
 	".LEFDE2:\n\n");
 #if LJ_HASFFI
     fprintf(ctx->fp,
@@ -6931,13 +6897,13 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.4byte .LEFDE3-.LASFDE3\n"
 	".LASFDE3:\n"
 	"\t.4byte .LASFDE3-.Lframe2\n"
-	"\t.4byte lj_vm_ffi_call\n"
-	"\t.4byte %d\n"
+	"\t.8byte lj_vm_ffi_call\n"
+	"\t.8byte %d\n"
 	"\t.uleb128 0\n"			/* augmentation length */
-	"\t.byte 0x9f\n\t.uleb128 1\n"
-	"\t.byte 0x90\n\t.uleb128 2\n"
+	"\t.byte 0xb7\n\t.sleb128 13\n"   /* lr */
+	"\t.byte 0xb4\n\t.sleb128 12\n"   /* fp */
 	"\t.byte 0xd\n\t.uleb128 0x10\n"
-	"\t.align 2\n"
+	"\t.align 8\n"
 	".LEFDE3:\n\n", (int)ctx->codesz - fcofs);
 #endif
     break;
