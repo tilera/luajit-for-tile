@@ -3842,56 +3842,13 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Math helper functions ----------------------------------------------
   |//-----------------------------------------------------------------------
   |
-  |// Modifies AT, TMP0, FRET1, FRET2, f4. Keeps all others incl. FARG1.
-  |.macro vm_round, func
-  |  //lui TMP0, 0x4330			// Hiword of 2^52 (double).
-  |  //mtc1 r0, f4
-  |  //mtc1 TMP0, f5
-  |  //abs.d FRET2, FARG1			// |x|
-  |   // mfc1 AT, f13
-  |  //c.olt.d 0, FRET2, f4
-  |   //add.d FRET1, FRET2, f4		// (|x| + 2^52) - 2^52
-  |  //bc1f 0, >1				// Truncate only if |x| < 2^52.
-  |//.  sub.d FRET1, FRET1, f4
-  |    cmplts AT, AT, zero
-  |//.if "func" == "ceil"
-  |   //lui TMP0, 0xbff0			// Hiword of -1 (double). Preserves -0.
-  |//.else
-  |   //lui TMP0, 0x3ff0			// Hiword of +1 (double).
-  |//.endif
-  |.if "func" == "trunc"
-  |//   mtc1 TMP0, f5
-  |//  c.olt.d 0, FRET2, FRET1		// |x| < result?
-  |//   sub.d FRET2, FRET1, f4
-  |//  movt.d FRET1, FRET2, 0		// If yes, subtract +1.
-  |//  neg.d FRET2, FRET1
-  |  jr lr
-  |//.  movn.d FRET1, FRET2, AT		// Merge sign bit back in.
-  |.else
-  |  //neg.d FRET2, FRET1
-  |   //mtc1 TMP0, f5
-  |  //movn.d FRET1, FRET2, AT		// Merge sign bit back in.
-  |//.if "func" == "ceil"
-  | // c.olt.d 0, FRET1, FARG1		// x > result?
-  |//.else
-  | // c.olt.d 0, FARG1, FRET1		// x < result?
-  |//.endif
-  | //  sub.d FRET2, FRET1, f4		// If yes, subtract +-1.
-  |  jr lr
-  |//.  movt.d FRET1, FRET2, 0
-  |.endif
-  |1:
-  |  jr lr
-  |//.  mov.d FRET1, FARG1
-  |.endmacro
-  |
   |->vm_floor:
-  |  vm_round floor
+  |  math_extern floor
   |->vm_ceil:
-  |  vm_round ceil
+  |  math_extern ceil
   |->vm_trunc:
   |.if JIT
-  |  vm_round trunc
+  |  math_extern trunc
   |.endif
   |
   |//-----------------------------------------------------------------------
