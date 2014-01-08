@@ -862,8 +862,9 @@
 |    B_subx_x1 R1, R3, R1
 |  or R0, R4, R0
 |  shru R0, R0, R1
-|  addxi R0, R0, 0
-|  subx R1, zero, R0
+|  B_X
+|    B_addxi_x0 R0, R0, 0
+|    B_subx_x1 R1, zero, R0
 |  cmovnez R0, R2, R1
 |  shruxi R1, R0, 31
 |  cmpeq R1, R1, R2
@@ -2347,13 +2348,15 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_cmovnez_x0 AT, CARG3, zero
   |    B_addi_x1 PC, BASE, FRAME_PC
   |  ld4s PC, PC
-  |  beqz AT, ->fff_fallback
+  |  B_X
+  |    B_move_x0 AT2, CARG2
+  |    B_beqz_x1 AT, ->fff_fallback
   |   //cvt.w.d FRET1, FARG2
-  |  move AT2, CARG2
   |  fixdfsi_inline AT2, AT3, AT4, AT5, AT6
-  |  move TMP2, AT2
-  |  //cvt.d.w FARG1, FARG1
-  |  moveli TMP3, 16368
+  |  B_X
+  |    B_move_x0 TMP2, AT2
+  |    //cvt.d.w FARG1, FARG1
+  |    B_moveli_x1 TMP3, 16368
   |  shl16insli TMP3, TMP3, 0
   |  B_X
   |    B_shl16insli_x0 TMP3, TMP3, 0
@@ -5148,12 +5151,13 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_TGETV:
     |  // RA = dst*8, RB = table*8, RC = key*8
     |  //decode_RB8a RB, INS
-    |  shrui RB, INS, 21
+    |  //shrui RB, INS, 21
     |  //decode_RB8b RB
-    |  bfextu RB, RB, 3, 10
-    |  shli RB, RB, 3
-    |  //decode_RDtoRC8 RC, RD
-    |  bfextu RC, RD, 3, 10
+    |  bfextu RB, INS, 24, 31
+    |  B_X
+    |    //decode_RDtoRC8 RC, RD
+    |    B_bfextu_x0 RC, RD, 3, 10
+    |    B_shli_x1 RB, RB, 3
     |  B_X
     |    B_shli_x0 RC, RC, 3
     |    B_add_x1 CARG2, BASE, RB
@@ -5172,18 +5176,20 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_add_x0 RA, BASE, RA
     |    B_ld_x1 AT2, CARG3
-    |  cmpne AT, TMP1, AT
     |  B_X
-    |    B_moveli_x0 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |    B_cmpne_x0 AT, TMP1, AT
+    |    B_moveli_x1 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
+    |  B_X
+    |    B_shl16insli_x0 AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
     |    B_bnez_x1 AT, ->vmeta_tgetv
-    |  shl16insli AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
-    |  cmpltu AT, TMP2, AT1
     |  B_X
-    |    B_addi_x0 AT1, zero, LJ_TSTR
+    |    B_cmpltu_x0 AT, TMP2, AT1
+    |    B_addi_x1 AT1, zero, LJ_TSTR
+    |  B_X
+    |    B_move_x0 CRET1, AT2
     |    B_beqz_x1 AT, >5
     |
     |  // Convert number key to integer, check for integerness and range.
-    |  move CRET1, AT2
     |  fixdfsi_inline CRET1, AT3, AT4, AT5, AT6
     |  B_X
     |    B_move_x0 TMP3, CRET1
@@ -5239,10 +5245,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  b ->vmeta_tgetv
     |
     |5:
-    |  addi STR:RC, CARG3, LO
+    |  //addi STR:RC, CARG3, LO
     |  B_X
     |    B_cmpne_x0 AT, TMP2, AT1
-    |    B_ld4s_x1 STR:RC, STR:RC
+    |    B_ld4s_x1 STR:RC, CARG3
     |  bnez AT, ->vmeta_tgetv
     |  b ->BC_TGETS_Z			// String key?
     break;
@@ -6107,8 +6113,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_add_x0 PC, TMP0, TMP2
     |    B_st1_x1 AT, TMP3
-    |  addi AT, PC, OFS_OP
-    |  st1 AT, TMP1
+    |  //addi AT, PC, OFS_OP
+    |  st1 PC, TMP1
     |  b <1
     break;
 
