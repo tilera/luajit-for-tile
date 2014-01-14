@@ -34,6 +34,7 @@
 |.define JGL,		r52	// On-trace: global_State + 32768.
 |
 |// Constants for type-comparisons, stores and conversions. C callee-save.
+|.define TISNUM,	r51
 |.define TISNIL,	r52
 |
 |// The following temporaries are not saved across C calls, except for RA.
@@ -72,17 +73,23 @@
 |.define CRET2,		r1
 |
 |// Stack layout while in interpreter. Must match with lj_frame.h.
-|.define CFRAME_SPACE,	136	// Delta for sp.
+|.define CFRAME_SPACE,	144	// Delta for sp.
 |
-|.define SAVE_ERRF,	160	// 64 bit C frame info.
-|.define SAVE_NRES,	152
-|.define SAVE_CFRAME,	144
-|.define SAVE_L,	136
+|.define SAVE_ERRF,	168	// 64 bit C frame info.
+|.define SAVE_NRES,	160
+|.define SAVE_CFRAME,	152
+|.define SAVE_L,	144
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by interpreter.
 |.define TILE_ABI_RESERV,	32	// .. 32+13*8: 64 bit GPR saves.
 |.define SAVE_MULTRES,		24	
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
+|
+|.macro v4int_l, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_v4int_l_x1 a, b, c
+|.endmacro
 |
 |.macro rotl, a, b, c
 |  B_X
@@ -595,6 +602,7 @@
 |  st_add sp, r38, -8
 |  st_add sp, r39, -8
 |  st_add sp, r45, -8
+|  st_add sp, r51, -8
 |  st_add sp, r52, -8
 |  st_add sp, lr, -TILE_ABI_RESERV
 |.endmacro
@@ -603,6 +611,7 @@
 |  addi sp, sp, TILE_ABI_RESERV
 |  ld_add lr, sp, 8
 |  ld_add r52, sp, 8
+|  ld_add r51, sp, 8
 |  ld_add r45, sp, 8
 |  ld_add r39, sp, 8
 |  ld_add r38, sp, 8
@@ -1050,9 +1059,10 @@ static void build_subroutines(BuildCtx *ctx)
   |  B_X
   |    B_addli_x0 L, sp, SAVE_L
   |    B_moveli_x1 TOBIT, 14403
-  |  B_X
-  |    B_addi_x0 TISNIL, zero, LJ_TNIL
-  |    B_ld_x1 L, L
+  |  B_Y2
+  |    B_addi_y0 TISNIL, zero, -1 // LJ_TNIL
+  |    B_movei_y1 TISNUM, -2 // LJ_TISNUM high 16bit
+  |    B_ld_y2 L, L
   |  B_X
   |    B_revbytes_x0 TOBIT, TOBIT
   |    B_addlo_x1 BASE, L:LREG->base
@@ -1076,7 +1086,9 @@ static void build_subroutines(BuildCtx *ctx)
   |    //st_vmstate
   |    B_addli_x0 AT1, DISPATCH, DISPATCH_GL(vmstate)
   |    B_st4_x1 AT, TMP1
-  |  st4 AT1, TMP0
+  |  B_X
+  |    B_shl16insli_x0 TISNUM, TISNUM, -1
+  |    B_st4_x1 AT1, TMP0
   |  B_X
   |    B_addi_x0 RD, zero, 16				// 2 results: false + error message.
   |    B_b_x1 ->vm_returnc
@@ -1147,6 +1159,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  st_add sp, r38, -8
   |  st_add sp, r39, -8
   |  st_add sp, r45, -8
+  |  st_add sp, r51, -8
   |  st_add sp, r52, -8
   |  B_X
   |    B_move_x0 L, CARG1
@@ -1189,9 +1202,10 @@ static void build_subroutines(BuildCtx *ctx)
   |  B_X
   |    B_addlo_x0 TMP1, L:LREG->top
   |    B_ld_x1 BASE, BASE
-  |  B_X
-  |    B_addi_x0 PC, BASE, FRAME_PC
-  |    B_ld_x1 TMP1, TMP1
+  |  B_Y2
+  |    B_addi_y0 PC, BASE, FRAME_PC
+  |    B_movei_y1 TISNUM, -2 // LJ_TISNUM high 16bit
+  |    B_ld_y2 TMP1, TMP1
   |  B_X
   |    B_sub_x0 RD, TMP1, BASE
   |    B_ld4s_x1 PC, PC
@@ -1199,16 +1213,16 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_addlo_x0 AT, L:LREG->status
   |    B_moveli_x1 TOBIT, 14403
   |  B_X
-  |    //li_vmstate INTERP
-  |    B_moveli_x0 TMP0, ~LJ_VMST_INTERP
+  |    B_shl16insli_x0 TISNUM, TISNUM, -1
   |    B_st1_x1 AT, zero
   |  B_X
   |    B_addli_x0 RD, RD, 8
   |    //st_vmstate
   |    B_addli_x1 AT, DISPATCH, DISPATCH_GL(vmstate)
-  |  B_X
-  |    B_move_x0 MULTRES, RD
-  |    B_st4_x1 AT, TMP0
+  |  B_Y3
+  |    B_move_y0 MULTRES, RD
+  |    B_movei_y1 TMP0, -1 // ~LJ_VMST_INTERP
+  |    B_st4_y2 AT, TMP0
   |  B_X
   |    B_andi_x0 TMP0, PC, FRAME_TYPE
   |    B_addi_x1 TISNIL, zero, LJ_TNIL
@@ -1241,6 +1255,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  st_add sp, r38, -8
   |  st_add sp, r39, -8
   |  st_add sp, r45, -8
+  |  st_add sp, r51, -8
   |  st_add sp, r52, -8
   |  B_X
   |    B_addi_x0 PC, zero, FRAME_C
@@ -1280,9 +1295,10 @@ static void build_subroutines(BuildCtx *ctx)
   |  B_X
   |    B_addlo_x0 TMP1, L:LREG->top		
   |    B_ld_x1 TMP2, TMP2			// TMP2 = old base (used in vmeta_call).
-  |  B_X
-  |    B_add_x0 PC, PC, BASE
-  |    B_ld_x1 TMP1, TMP1
+  |  B_Y2
+  |    B_add_y0 PC, PC, BASE
+  |    B_movei_y1 TISNUM, -2
+  |    B_ld_y2 TMP1, TMP1
   |  B_X
   |    B_sub_x0 NARGS8:RC, TMP1, BASE
   |    B_sub_x1 PC, PC, TMP2			// PC = frame delta + frame type
@@ -1294,7 +1310,9 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_revbytes_x0 TOBIT, TOBIT
   |    //st_vmstate
   |    B_addli_x1 AT, DISPATCH, DISPATCH_GL(vmstate)
-  |  st4 AT, TMP0
+  |  B_X
+  |    B_shl16insli_x0 TISNUM, TISNUM, -1
+  |    B_st4_x1 AT, TMP0
   |
   |->vm_call_dispatch:
   |  // TMP2 = old base, BASE = new base, RC = nargs*8, PC = caller PC
@@ -1327,6 +1345,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  st_add sp, r38, -8
   |  st_add sp, r39, -8
   |  st_add sp, r45, -8
+  |  st_add sp, r51, -8
   |  st_add sp, r52, -8
   |  B_X
   |    B_move_x0 L, CARG1
@@ -1484,6 +1503,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  b >1
   |
   |->vmeta_tgetb:			// TMP0 = index
+  |.if not DUALNUM
   |  B_X
   |    B_cmpltsi_x0 AT, TMP0, 0
   |    B_sub_x1 AT1, zero, TMP0
@@ -1499,6 +1519,12 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_fdouble_pack2_x0 TMP0, AT1, zero
   |    B_addli_x1 CARG3, DISPATCH, DISPATCH_GL(tmptv)
   |  st CARG3, TMP0
+  |.else
+  |  B_X
+  |    B_v4int_l_x0 TMP0, TMP0, TISNUM
+  |    B_addli_x1 CARG3, DISPATCH, DISPATCH_GL(tmptv)
+  |  st CARG3, TMP0
+  |.endif
   |
   |->vmeta_tgetv:
   |1:
@@ -1567,6 +1593,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  b >1
   |
   |->vmeta_tsetb:			// TMP0 = index
+  |.if not DUALNUM
   |  B_X
   |    B_cmpltsi_x0 AT, TMP0, 0
   |    B_sub_x1 AT1, zero, TMP0
@@ -1582,6 +1609,12 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_fdouble_pack2_x0 TMP0, AT1, zero
   |    B_addli_x1 CARG3, DISPATCH, DISPATCH_GL(tmptv)
   |  st CARG3, TMP0
+  |.else
+  |  B_X
+  |    B_v4int_l_x0 TMP0, TMP0, TISNUM
+  |    B_addli_x1 CARG3, DISPATCH, DISPATCH_GL(tmptv)
+  |  st CARG3, TMP0
+  |.endif
   |
   |->vmeta_tsetv:
   |1:
@@ -2223,7 +2256,11 @@ static void build_subroutines(BuildCtx *ctx)
   |  beqz TMP0, ->fff_fallback
   |  addi AT, sp, SAVE_PC
   |  B_X
+  |.if DUALNUM
+  |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_str_fromnumber)
+  |.else
   |    B_addli_x0 CFUNCADDR, DISPATCH, DISPATCH_GOT(lj_str_fromnum)
+  |.endif
   |    B_st_x1 AT, PC
   |  ffgccheck
   |  // load_got lj_str_fromnum
@@ -2453,7 +2490,11 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_st4_x1 AT, zero
   |  B_X
   |    B_addi_x0 RD, zero, (3+1)*8
+  |.if DUALNUM
   |    B_st4_x1 AT1, zero
+  |.else
+  |    B_st4_x1 AT1, TISNUM
+  |.endif
   |  st RA, AT2
   |  b ->fff_res
   |
@@ -3804,6 +3845,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  revbytes TOBIT, TOBIT
   |  shli MULTRES, CRET1, 3
   |    addi TISNIL, zero, LJ_TNIL
+  |    movei TISNUM, -2
+  |    shl16insli TISNUM, TISNUM, -1
   |   addi AT, sp, SAVE_MULTRES
   |  st AT, MULTRES
   |  addlo TMP1, LFUNC:TMP1->pc
@@ -3899,6 +3942,8 @@ static void build_subroutines(BuildCtx *ctx)
   |   move L, CRET1
   |    moveli TOBIT, 14403
   |    revbytes TOBIT, TOBIT
+  |  movei TISNUM, -2
+  |  shl16insli TISNUM, TISNUM, -1
   |  addi LFUNC:RB, BASE, FRAME_FUNC
   |  ld4s LFUNC:RB, LFUNC:RB
   |    li_vmstate INTERP

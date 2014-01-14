@@ -344,6 +344,8 @@ local map_op = {
   B_moveli_x1_2 =	"00000FC02DI",
   B_movei_x0_2 =	"40100FC01De",
   B_movei_x1_2 =	"30100FC02DE",
+  B_movei_y0_2 =	"00000FC04De",
+  B_movei_y1_2 =	"00100FC04DE",
   B_addlo_x0_2 =	"100000001Do",
   B_addlo_x1_2 =	"000000002DO",
   B_shl16insli_x0_3 =	"700000001DAi",
@@ -352,6 +354,8 @@ local map_op = {
   B_sub_x1_3 =		"50D000002DAB",
   B_subx_x0_3 =		"514000001DAB",
   B_subx_x1_3 =		"50CC00002DAB",
+  B_v4int_l_x0_3 =	"526000001DAB",
+  B_v4int_l_x1_3 =	"518C00002DAB",
 
   -- Logical Instructions.
   B_and_x0_3 =		"501000001DAB",
