@@ -4461,6 +4461,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  shl16insli TMP3, TMP3, 0
     |  cmpleu AT1, TMP0, TISNUM
     |  cmpleu AT2, TMP1, TISNUM
+    |  cmpne AT3, TMP0, TISNUM
+    |  cmpne AT4, TMP1, TISNUM
     |  decode_RD4b TMP2
     |  or AT, AT1, AT2
     |  add TMP2, TMP2, TMP3
@@ -4659,30 +4661,40 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addli PC, PC, 4
     |  addi TMP0, RA, HI
     |  ld4s TMP0, TMP0
-    |  ld AT2, RA
+    |  ld4s CARG2, RA
     |  add RD, KBASE, RD
     |  addi TMP2, PC, -4+OFS_RD
     |  ld2u TMP2, TMP2
-    |  ld AT3, RD
+    |  ld4s CARG3, RD
+    |  addi TMP1, RD, HI
+    |  ld4s TMP1, TMP1
     |  moveli TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
     |  shl16insli TMP3, TMP3, 0
-    |  cmpltu AT, TMP0, TISNUM
+    |  cmpne AT3, TMP0, TISNUM
+    |  cmpne AT4, TMP1, TISNUM
     |  decode_RD4b TMP2
     |  add TMP2, TMP2, TMP3
-    |.if FFI
-    |  beqz AT, >5
-    |.else
-    |  beqz AT, >1
-    |.endif
-    |  fdouble_add_flags AT, AT2, AT3
-    |  bfextu AT, AT, 30, 30
     if (vk) {
+      |->BC_ISEQN_Z:
+    } else {
+      |->BC_ISNEN_Z:
+    }
+    |  bnez AT3, >7
+    |  bnez AT4, >8
+    |  cmpeq AT, CARG2, CARG3
+    if (vk) {
+      |4:
       |  cmoveqz TMP2, AT, zero
       |  add PC, PC, TMP2
+      |.if not FFI
       |1:
+      |.endif
     } else {
+      |4:
       |  cmovnez TMP2, AT, zero
+      |.if not FFI
       |1:
+      |.endif
       |  add PC, PC, TMP2
     }
     |  ins_next
@@ -4692,6 +4704,23 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpeq AT, TMP0, AT
     |  bnez AT, ->vmeta_equal_cd
     |  b <1
+    |.endif
+    |.if DUALNUM
+    |  cmpltu AT, TMP0, TISNUM
+    |  beqz AT, <5
+    |  ld CARG2, RA
+    |  cmpltu AT, TMP1, TISNUM
+    |  bnez AT, >2
+    |  fixsidf_inline CARG3, AT, AT1, AT2
+    |  b >3
+    |8:
+    |  fixsidf_inline CARG2, AT, AT1, AT2
+    |2:
+    |  ld CARG3, RD
+    |3:
+    |  fdouble_add_flags AT, CARG2, CARG3
+    |  bfextu AT, AT, 30, 30
+    |  b <4
     |.endif
     |.else // DUALNUM
     |  // RA = src*8, RD = num_const*8, JMP with RD = target
