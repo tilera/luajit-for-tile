@@ -284,7 +284,7 @@
 #define LJ_TARGET_MASKSHIFT	1
 #define LJ_TARGET_MASKROT	1
 #define LJ_TARGET_UNIFYROT	2	/* Want only IR_BROR. */
-#define LJ_ARCH_NUMMODE		LJ_NUMMODE_SINGLE
+#define LJ_ARCH_NUMMODE		LJ_NUMMODE_DUAL_SINGLE
 #define LJ_ARCH_NOJIT		1       /* temperarily */
 
 #else
