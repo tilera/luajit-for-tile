@@ -49,7 +49,7 @@ LJ_ASMF void lj_vm_exit_handler(void);
 LJ_ASMF void lj_vm_exit_interp(void);
 
 /* Internal math helper functions. */
-#if LJ_TARGET_X86ORX64 || LJ_TARGET_PPC
+#if LJ_TARGET_X86ORX64 || LJ_TARGET_PPC || LJ_TARGET_TILEGX
 #define lj_vm_floor	floor
 #define lj_vm_ceil	ceil
 #else
