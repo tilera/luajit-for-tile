@@ -85,6 +85,12 @@
 |.define SAVE_PC,		16	
 |//----- 8 byte aligned, ^^^^ 32 byte register save area, owned by callee.
 |
+|.macro mulx, a, b, c
+|  B_X
+|    B_mulx_x0 a, b, c
+|    B_fnop_x1
+|.endmacro
+|
 |.macro v4int_l, a, b, c
 |  B_X
 |    B_fnop_x0
@@ -5291,7 +5297,21 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.elif "ins" == "sub"
     |  sub AT2, AT2, AT3
     |.elif "ins" == "mul"
+    |  mulx AT2, AT2, AT3
+    |.elif "ins" == "div"
+    |  B_X
+    |    B_move_x0 CARG1, AT2
+    |    B_move_x1 CARG2, AT3
+    |  load_got __divsi3
+    |  call_extern
+    |  move AT2, CRET1
     |.else
+    |  B_X
+    |    B_move_x0 CARG1, AT2
+    |    B_move_x1 CARG2, AT3
+    |  load_got __modsi3
+    |  call_extern
+    |  move AT2, CRET1
     |.endif
     |  // TBD: check overflow
     |  ins_next1

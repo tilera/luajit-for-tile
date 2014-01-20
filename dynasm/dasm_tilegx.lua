@@ -356,6 +356,7 @@ local map_op = {
   B_subx_x1_3 =		"50CC00002DAB",
   B_v4int_l_x0_3 =	"526000001DAB",
   B_v4int_l_x1_3 =	"518C00002DAB",
+  B_mulx_x0_3 =		"50D000001DAB",
 
   -- Logical Instructions.
   B_and_x0_3 =		"501000001DAB",
