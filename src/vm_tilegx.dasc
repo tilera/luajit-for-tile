@@ -4559,12 +4559,12 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmpne AT3, TMP0, TISNUM
     |  cmpne AT4, TMP1, TISNUM
     |  decode_RD4b TMP2
-    |  or AT, AT1, AT2
+    |  and AT, AT1, AT2
     |  add TMP2, TMP2, TMP3
     if (vk) {
-      |  beqz AT, ->BC_ISEQN_Z
+      |  bnez AT, ->BC_ISEQN_Z
     } else {
-      |  beqz AT, ->BC_ISNEN_Z
+      |  bnez AT, ->BC_ISNEN_Z
     }
     |5:  // Either or both types are not numbers.
     |.if FFI
@@ -6016,7 +6016,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_ld4s_x1 TAB:RB, TAB:RB
     |  B_X
     |    B_add_x0 RA, BASE, RA
-    |    B_ld_x1 RC, CARG3
+    |    B_ld4s_x1 RC, CARG3
     |  cmpne AT, TMP1, AT
     |  bnez AT, ->vmeta_tgetv
     |  B_X
@@ -6030,15 +6030,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  addlo TMP1, TAB:RB->array
     |  ld4u TMP1, TMP1
     |  cmpltu AT, RC, TMP0
-    |  shli TMP3, RC, 3
+    |  shli TMP2, RC, 3
     |  B_X
-    |    B_add_x0 TMP3, TMP1, TMP3
+    |    B_add_x0 TMP2, TMP1, TMP2
     |    B_beqz_x1 AT, ->vmeta_tgetv		// Integer key and in array part?
-    |  addi TMP0, TMP3, HI
+    |  addi TMP0, TMP2, HI
     |  ld4s TMP0, TMP0
     |  B_X
     |    B_cmpeq_x0 AT, TMP0, TISNIL
-    |    B_ld_x1 AT2, TMP3
+    |    B_ld_x1 AT2, TMP2
     |  bnez AT, >2
     |1:
     |  ins_next1
