@@ -4807,6 +4807,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  b <1
     |.endif
     |.if DUALNUM
+    |7:
     |  cmpltu AT, TMP0, TISNUM
     |  beqz AT, <5
     |  ld CARG2, RA
