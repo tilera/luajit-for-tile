@@ -3092,8 +3092,7 @@ static void build_subroutines(BuildCtx *ctx)
   |.if DUALNUM
   |  addi CARG3, BASE, HI
   |  ld4s CARG3, CARG3
-  |   addi STR:CARG1, BASE, LO
-  |   ld4s STR:CARG1, STR:CARG1
+  |  ld4s STR:CARG1, BASE
   |  xori AT, NARGS8:RC, 8
   |  addli CARG3, CARG3, -LJ_TSTR
   |  or AT, AT, CARG3
@@ -4461,11 +4460,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |1:
     |  ins_next
     |2:  // RA is not an integer.
-    |  cmpltu AT, TMP0, TISNUM
-    |  beqz AT, ->vmeta_comp
+    |  cmpltu AT, TISNUM, TMP0
+    |  bnez AT, ->vmeta_comp
     |  ld AT2, CARG2
-    |  cmpltu AT, TMP1, TISNUM
-    |  beqz AT, ->vmeta_comp
+    |  cmpltu AT, TISNUM, TMP1
+    |  bnez AT, ->vmeta_comp
     |  cmpltu AT, TMP1, TISNUM
     |  bnez AT, >4
     |  fixsidf_inline AT3, AT, AT1, AT4
@@ -5252,8 +5251,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s AT3, CARG4
     |  cmpne AT, TMP1, TISNUM
     |  cmpltu AT4, TMP1, TISNUM
+    |  cmpltu AT5, TMP2, TISNUM
     |  cmpne AT1, TMP2, TISNUM
     |  or AT, AT, AT1
+    |  and AT4, AT4, AT5
     ||  break;
     ||case 1:
     |  B_X
@@ -5268,8 +5269,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s AT2, CARG3
     |  cmpne AT, TMP1, TISNUM
     |  cmpltu AT4, TMP1, TISNUM
+    |  cmpltu AT5, TMP2, TISNUM
     |  cmpne AT1, TMP2, TISNUM
     |  or AT, AT, AT1
+    |  and AT4, AT4, AT5
     ||  break;
     ||default:
     |  B_X
@@ -5294,29 +5297,38 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add RA, BASE, RA
     |  bnez AT, >1
     |.if "ins" == "add"
-    |  add AT2, AT2, AT3
+    |  add CRET1, AT2, AT3
+    |  xor AT4, CRET1, AT2
+    |  xor AT5, CRET1, AT3
+    |  and AT5, AT4, AT5
+    |  bfextu AT5, AT5, 31, 31
     |.elif "ins" == "sub"
-    |  sub AT2, AT2, AT3
+    |  sub CRET1, AT2, AT3
+    |  xor AT4, CRET1, AT2
+    |  xor AT5, AT2, AT3
+    |  and AT5, AT4, AT5
+    |  bfextu AT5, AT5, 31, 31
     |.elif "ins" == "mul"
-    |  mulx AT2, AT2, AT3
+    |  mulx CRET1, AT2, AT3
+    |  move AT5, zero
     |.elif "ins" == "div"
     |  B_X
     |    B_move_x0 CARG1, AT2
     |    B_move_x1 CARG2, AT3
     |  load_got __divsi3
     |  call_extern
-    |  move AT2, CRET1
+    |  move AT5, zero
     |.else
     |  B_X
     |    B_move_x0 CARG1, AT2
     |    B_move_x1 CARG2, AT3
     |  load_got __modsi3
     |  call_extern
-    |  move AT2, CRET1
+    |  move AT5, zero
     |.endif
-    |  // TBD: check overflow
+    |  bnez AT5, ->vmeta_arith
     |  ins_next1
-    |  v4int_l AT2, TISNUM, AT2
+    |  v4int_l AT2, TISNUM, CRET1
     |  st RA, AT2
     |  ins_next2
     |1:
