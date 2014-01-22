@@ -2406,11 +2406,11 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_cmpeqi_x0 AT, CARG3, -12 // LJ_TTAB
   |    B_bnez_x1 AT, ->fff_fallback
   |  B_X
-  |    B_cmpeq_x0 AT, CARG4, TISNUM
+  |    B_cmpne_x0 AT, CARG4, TISNUM
   |    B_beqz_x1 AT, ->fff_fallback
   |  B_X
   |    B_addi_x0 PC, BASE, FRAME_PC
-  |    B_beqz_x1 AT, ->fff_fallback
+  |    B_bnez_x1 AT, ->fff_fallback
   |  B_X
   |    B_addlo_x0 TMP0, TAB:CARG1->asize
   |    B_ld4s_x1 PC, PC
@@ -4470,8 +4470,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  fixsidf_inline AT3, AT, AT1, AT4
     |  b >5
     |3:  // RA is an integer, RD is not an integer.
-    |  cmpltu AT, TMP1, TISNUM
-    |  beqz AT, ->vmeta_comp
+    |  cmpltu AT, TISNUM, TMP1
+    |  bnez AT, ->vmeta_comp
     |  fixsidf_inline AT2, AT, AT1, AT4
     |4:
     |  ld AT3, CARG3
@@ -5016,7 +5016,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  st RA, AT2
     |  ins_next2
     |1:
-    |  ld4s AT2, CARG3
     |  shli AT1, AT1, 63
     |  B_X
     |    B_xor_x0 AT2, AT2, AT1
@@ -5250,10 +5249,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s TMP2, TMP2
     |  ld4s AT3, CARG4
     |  cmpne AT, TMP1, TISNUM
-    |  cmpltu AT4, TMP1, TISNUM
-    |  cmpltu AT5, TMP2, TISNUM
     |  cmpne AT1, TMP2, TISNUM
     |  or AT, AT, AT1
+    |  cmpltu AT4, TMP1, TISNUM
+    |  cmpltu AT5, TMP2, TISNUM
     |  and AT4, AT4, AT5
     ||  break;
     ||case 1:
@@ -5268,10 +5267,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ld4s TMP2, TMP2
     |  ld4s AT2, CARG3
     |  cmpne AT, TMP1, TISNUM
-    |  cmpltu AT4, TMP1, TISNUM
-    |  cmpltu AT5, TMP2, TISNUM
     |  cmpne AT1, TMP2, TISNUM
     |  or AT, AT, AT1
+    |  cmpltu AT4, TMP1, TISNUM
+    |  cmpltu AT5, TMP2, TISNUM
     |  and AT4, AT4, AT5
     ||  break;
     ||default:
@@ -5287,10 +5286,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_cmpne_x0 AT, TMP1, TISNUM
     |    B_ld4s_x1 AT3, CARG4
-    |  cmpltu AT4, TMP1, TISNUM
-    |  cmpltu AT5, TMP2, TISNUM
     |  cmpne AT1, TMP2, TISNUM
     |  or AT, AT, AT1
+    |  cmpltu AT4, TMP1, TISNUM
+    |  cmpltu AT5, TMP2, TISNUM
     |  and AT4, AT4, AT5
     ||  break;
     ||}
@@ -5727,16 +5726,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next
     |
     |2:  // Check if new value is collectable.
+    |  addi AT, zero, LJ_TISGCV
+    |  sub AT2, TMP2, AT
+    |  sub AT3, TISNUM, AT
     |  B_X
-    |    B_addi_x0 AT, zero, LJ_TISGCV
-    |    B_moveli_x1 AT1, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-    |  B_X
-    |    B_shl16insli_x0 AT1, AT1, (short)(LJ_TISNUM & 0xFFFF)
-    |    B_sub_x1 AT2, TMP2, AT
-    |  sub AT3, AT1, AT
-    |  bfextu AT3, AT3, 0, 31
-    |  B_X
-    |    B_cmpltu_x0 AT, AT2, AT3
+    |    B_cmpleu_x0 AT, AT2, AT3
     |    B_addi_x1 TMP1, RD, LO
     |  ld4s TMP1, TMP1
     |  B_X
@@ -6075,7 +6069,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  bnez AT, >2
     |1:
     |  ins_next1
-    |   st RA, AT2
+    |  st RA, AT2
     |  ins_next2
     |
     |2:  // Check for __index if table value is nil.
