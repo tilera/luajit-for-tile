@@ -362,7 +362,7 @@ int dasm_encode(Dst_DECL, void *buffer)
 	case DASM_REL_PC_X1_J:
 	  CK(n >= 0, UNDEF_PC);
 	  n = *DASM_POS2PTR(D, n);
-	  if (action == DASM_REL_LG_X1_BR || action == DASM_REL_LG_X1_J)
+	  if (action == DASM_REL_LG_X1_BR || action == DASM_REL_PC_X1_BR)
 	    n = n - (long)((char *)cp - base) + 8;
 	  else
 	    n = (n + (long)base) & 0x0fffffff;
@@ -373,10 +373,10 @@ int dasm_encode(Dst_DECL, void *buffer)
 	     ((n + ((ins & 2048) ? 0x00020000 : 0)) >>
 	       ((ins & 2048) ? 18 : 28)) == 0, RANGE_REL);
 #endif
-	  if (action == DASM_REL_LG_X1_BR)
+	  if (action == DASM_REL_LG_X1_BR || action == DASM_REL_PC_X1_BR)
 	    cp[-1] |= (((n >> 3) & 0x3FL) << 31)
 		       | (((n >> 9) & 0x7FFL) << 43);
-	  else if (action == DASM_REL_LG_X1_J)
+	  else if (action == DASM_REL_LG_X1_J || action == DASM_REL_PC_X1_J)
 	    cp[-1] |= ((n >> 3) & 0x7FFFFFFL) << 31;
 
 	  break;
