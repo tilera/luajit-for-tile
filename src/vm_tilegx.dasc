@@ -1978,10 +1978,12 @@ static void build_subroutines(BuildCtx *ctx)
   |.macro .ffunc_1, name
   |->ff_ .. name:
   |  addi CARG3, BASE, HI
-  |  B_X
-  |    B_addi_x0 CARG1, BASE, LO
-  |    B_ld4s_x1 CARG3, CARG3
-  |  ld4s CARG1, CARG1
+  |  ld4s CARG3, CARG3
+  |.if "name" == "math_abs"
+  |  ld CARG1, BASE
+  |.else
+  |  ld4s CARG1, BASE
+  |.endif
   |  beqz NARGS8:RC, ->fff_fallback
   |.endmacro
   |
@@ -2007,12 +2009,8 @@ static void build_subroutines(BuildCtx *ctx)
   |    B_ld_x1 CARG1, BASE
   |  ld4s CARG3, CARG3
   |  beqz NARGS8:RC, ->fff_fallback
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu AT, CARG3, AT
-  |.if "name" == "math_abs"
-  |  bfextu  CRET1, CARG1, 0, 62
-  |.elif "name" == "math_rad"
+  |  cmpltu AT, CARG3, TISNUM
+  |.if "name" == "math_rad"
   |  addlo CARG2, CFUNC:RB->upvalue[0]
   |  ld CARG2, CARG2
   |.endif
@@ -2816,7 +2814,24 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |//-- Math library -------------------------------------------------------
   |
-  |.ffunc_n math_abs
+  |.ffunc_1 math_abs
+  |  cmpne AT, CARG3, TISNUM
+  |  cmpltu AT1, CARG3, TISNUM
+  |.if DUALNUM
+  |  bnez AT, >2
+  |  bgez CARG1, ->fff_resi
+  |  subx CARG1, zero, CARG1
+  |  bltz CARG1, >1
+  |  b ->fff_resi
+  |1:
+  |  moveli CRET1, -8127
+  |  bfextu CRET1, CRET1, 0, 15
+  |  revbytes CRET1, CRET1
+  |  b ->fff_resn
+  |2:
+  |.endif
+  |  beqz AT1, ->fff_fallback
+  |  bfextu CRET1, CARG1, 0, 62
   |->fff_resn:
   |  addi PC, BASE, FRAME_PC
   |  B_X
@@ -3036,14 +3051,10 @@ static void build_subroutines(BuildCtx *ctx)
   |  B_X
   |    B_addi_x0 CARG3, BASE, HI
   |    B_ld_x1 CRET1, BASE
+  |  ld4s CARG3, CARG3
+  |  beqz NARGS8:RC, ->fff_fallback
   |  B_X
-  |    B_moveli_x0 AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |    B_ld4s_x1 CARG3, CARG3
-  |  B_X
-  |    B_shl16insli_x0 AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-  |    B_beqz_x1 NARGS8:RC, ->fff_fallback
-  |  B_X
-  |    B_cmpltu_x0 AT, CARG3, AT
+  |    B_cmpltu_x0 AT, CARG3, TISNUM
   |    B_add_x1 TMP2, BASE, NARGS8:RC
   |  B_X
   |    B_addli_x0 TMP1, BASE, 8
@@ -3057,9 +3068,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  B_X
   |    B_addli_x0 TMP1, TMP1, 8
   |    B_ld4s_x1 CARG3, CARG3
-  |  moveli AT, (short)((LJ_TISNUM >> 16) & 0xFFFF)
-  |  shl16insli AT, AT, (short)(LJ_TISNUM & 0xFFFF)
-  |  cmpltu AT, CARG3, AT
+  |  cmpltu AT, CARG3, TISNUM
   |  beqz AT, ->fff_fallback
   |.if ismax
   |  fdouble_add_flags AT, CARG2, CRET1
@@ -5010,7 +5019,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_movei_x1 AT1, -1
     |  cmpne AT3, TMP0, TISNUM
     |  bnez AT3, >1
-    |  sub AT2, zero, AT2
+    |  subx AT2, zero, AT2
     |  v4int_l AT2, TISNUM, AT2
     |  ins_next1
     |  st RA, AT2
@@ -5294,6 +5303,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     ||  break;
     ||}
     |  add RA, BASE, RA
+    |.if "ins" == "div"
+    |  b >1
+    |.endif
     |  bnez AT, >1
     |.if "ins" == "add"
     |  add CRET1, AT2, AT3
@@ -5309,13 +5321,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  bfextu AT5, AT5, 31, 31
     |.elif "ins" == "mul"
     |  mulx CRET1, AT2, AT3
-    |  move AT5, zero
-    |.elif "ins" == "div"
-    |  B_X
-    |    B_move_x0 CARG1, AT2
-    |    B_move_x1 CARG2, AT3
-    |  load_got __divsi3
-    |  call_extern
     |  move AT5, zero
     |.else
     |  B_X
