@@ -449,6 +449,7 @@ local map_op = {
   B_cmpeq_x1_3 =	"501400002DAB",
   B_cmpne_x0_3 =	"503000001DAB",
   B_cmpne_x1_3 =	"503000002DAB",
+  B_cmpne_y1_3 =	"009C00004DAB",
   B_cmplts_x0_3 =	"502800001DAB",
   B_cmplts_x1_3 =	"502800002DAB",
   B_cmpltu_x0_3 =	"502C00001DAB",
