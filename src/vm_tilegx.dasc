@@ -121,6 +121,12 @@
 |    B_subx_x1 a, b, c
 |.endmacro
 |
+|.macro addx, a, b, c
+|  B_X
+|    B_fnop_x0
+|    B_addx_x1 a, b, c
+|.endmacro
+|
 |.macro move, a, b
 |  B_X
 |    B_fnop_x0
@@ -1977,30 +1983,32 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.macro .ffunc_1, name
   |->ff_ .. name:
-  |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |.if "name" == "math_abs"
   |  ld CARG1, BASE
+  |.if "name" == "math_abs"
+  |  shrsi CARG3, CARG1, 32
   |.else
-  |  ld4s CARG1, BASE
+  |  B_X
+  |    B_bfexts_x0 CARG1, CARG1, 0, 31
+  |    B_shrsi_x1 CARG3, CARG1, 32
   |.endif
   |  beqz NARGS8:RC, ->fff_fallback
   |.endmacro
   |
   |.macro .ffunc_2, name
   |->ff_ .. name:
-  |  B_Y2
-  |    B_addi_y0 CARG4, BASE, 12 //8+HI
-  |    B_addi_y1 CARG3, BASE, 4 //HI
-  |    B_ld4s_y2 CARG1, BASE
+  |  B_X
+  |    B_addi_x0 CARG2, BASE, 8
+  |    B_ld_x1 CARG1, BASE
+  |  B_X
+  |    B_shrsi_x0 CARG3, CARG1, 32
+  |    B_ld_x1 CARG2, CARG2
   |  B_X
   |    B_cmpltui_x0 AT, NARGS8:RC, 16
-  |    B_ld4s_x1 CARG3, CARG3
-  |  ld4s CARG4, CARG4
+  |    B_shrsi_x1 CARG4, CARG2, 32
+  |  bfexts CARG1, CARG1, 0, 31
   |  B_X
-  |    B_addi_x0 CARG2, BASE, 8+LO
+  |    B_bfexts_x0 CARG2, CARG2, 0, 31
   |    B_bnez_x1 AT, ->fff_fallback
-  |  ld4s CARG2, CARG2
   |.endmacro
   |
   |.macro .ffunc_n, name	// Caveat: has delay slot!
@@ -4471,24 +4479,23 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.if DUALNUM
     |  // RA = src1*8, RD = src2*8, JMP with RD = target
     |  B_X
-    |    B_add_x0 CARG2, BASE, RA
-    |    B_add_x1 CARG3, BASE, RD
-    |  B_Y2
-    |    B_addi_y0 TMP0, CARG2, 4 //HI
-    |    B_addi_y1 TMP1, CARG3, 4 //HI
-    |    B_ld4s_y2 AT2, CARG2
+    |    B_add_x0 CARG3, BASE, RD
+    |    B_add_x1 CARG2, BASE, RA
+    |  ld AT2, CARG2
+    |  ld AT3, CARG3
     |  B_X
-    |    B_addi_x0 TMP2, PC, OFS_RD
-    |    B_ld4s_x1 TMP0, TMP0
+    |    B_shrsi_x0 TMP0, AT2, 32
+    |    B_shrsi_x1 TMP1, AT3, 32
     |  B_X
-    |    B_moveli_x0 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
-    |    B_ld4s_x1 TMP1, TMP1
+    |    B_bfexts_x0 AT2, AT2, 0, 31
+    |    B_addi_x1 TMP2, PC, OFS_RD
+    |  B_Y1
+    |    B_addi_y0 PC, PC, 4
+    |    B_cmpne_y1 AT, TMP0, TISNUM
+    |    B_ld2u_y2 TMP2, TMP2
     |  B_X
-    |    B_addi_x0 PC, PC, 4
-    |    B_ld4s_x1 AT3, CARG3
-    |  B_X
-    |    B_cmpne_x0 AT, TMP0, TISNUM
-    |    B_ld2u_x1 TMP2, TMP2
+    |    B_bfexts_x0 AT3, AT3, 0, 31
+    |    B_moveli_x1 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
     |  B_X
     |    B_cmpne_x0 AT1, TMP1, TISNUM
     |    B_shl16insli_x1 TMP3, TMP3, 0
@@ -5319,17 +5326,14 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_shli_x1 RC, RC, 3
     |  B_X
     |    B_add_x0 CARG4, KBASE, RC
-    |    B_ld4s_x1 AT2, CARG3
+    |    B_ld_x1 AT2, CARG3
     |  B_X
-    |    B_addi_x0 TMP2, CARG4, HI
-    |    B_addi_x1 TMP1, CARG3, HI
-    |  ld4s TMP1, TMP1
+    |    B_shrsi_x0 TMP1, AT2, 32
+    |    B_ld_x1 AT3, CARG4
     |  B_X
     |    B_cmpne_x0 AT, TMP1, TISNUM
-    |    B_ld4s_x1 TMP2, TMP2
-    |  B_X
-    |    B_cmpne_x0 AT1, TMP2, TISNUM
-    |    B_ld4s_x1 AT3, CARG4
+    |    B_shrsi_x1 TMP2, AT3, 32
+    |  cmpne AT1, TMP2, TISNUM
     |  B_X
     |    B_or_x0 AT, AT, AT1
     |    B_cmpltu_x1 AT4, TMP1, TISNUM
@@ -5342,17 +5346,14 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_shli_x1 RC, RC, 3
     |  B_X
     |    B_add_x0 CARG3, KBASE, RC
-    |    B_ld4s_x1 AT3, CARG4
+    |    B_ld_x1 AT3, CARG4
     |  B_X
-    |    B_addi_x0 TMP1, CARG4, HI
-    |    B_addi_x1 TMP2, CARG3, HI
-    |  ld4s TMP1, TMP1
+    |    B_shrsi_x0 TMP1, AT3, 32
+    |    B_ld_x1 AT2, CARG3
     |  B_X
     |    B_cmpne_x0 AT, TMP1, TISNUM
-    |    B_ld4s_x1 TMP2, TMP2
-    |  B_X
-    |    B_cmpne_x0 AT1, TMP2, TISNUM
-    |    B_ld4s_x1 AT2, CARG3
+    |    B_shrsi_x1 TMP2, AT2, 32
+    |  cmpne AT1, TMP2, TISNUM
     |  B_X
     |    B_or_x0 AT, AT, AT1
     |    B_cmpltu_x1 AT4, TMP1, TISNUM
@@ -5365,17 +5366,14 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_shli_x1 RC, RC, 3
     |  B_X
     |    B_add_x0 CARG4, BASE, RC
-    |    B_addi_x1 TMP1, CARG3, HI
+    |    B_ld_x1 AT2, CARG3
     |  B_X
-    |    B_addi_x0 TMP2, CARG4, HI
-    |    B_ld4s_x1 TMP1, TMP1
-    |  ld4s TMP2, TMP2
+    |    B_shrsi_x0 TMP1, AT2, 32
+    |    B_ld_x1 AT3, CARG4
     |  B_X
     |    B_cmpne_x0 AT, TMP1, TISNUM
-    |    B_ld4s_x1 AT2, CARG3
-    |  B_X
-    |    B_cmpne_x0 AT1, TMP2, TISNUM
-    |    B_ld4s_x1 AT3, CARG4
+    |    B_shrsi_x1 TMP2, AT3, 32
+    |  cmpne AT1, TMP2, TISNUM
     |  B_X
     |    B_or_x0 AT, AT, AT1
     |    B_cmpltu_x1 AT4, TMP1, TISNUM
@@ -5393,14 +5391,14 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_bnez_x1 AT, >1
     |.endif
     |.if "ins" == "add"
-    |  add CRET1, AT2, AT3
+    |  addx CRET1, AT2, AT3
     |  B_X
     |    B_xor_x0 AT4, CRET1, AT2
     |    B_xor_x1 AT5, CRET1, AT3
     |  and AT5, AT4, AT5
     |  bfextu AT5, AT5, 31, 31
     |.elif "ins" == "sub"
-    |  sub CRET1, AT2, AT3
+    |  subx CRET1, AT2, AT3
     |  B_X
     |    B_xor_x0 AT4, CRET1, AT2
     |    B_xor_x1 AT5, AT2, AT3
@@ -5412,10 +5410,12 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_move_x1 AT5, zero
     |.else
     |  B_X
-    |    B_move_x0 CARG1, AT2
-    |    B_move_x1 CARG2, AT3
-    |  load_got __modsi3
-    |  call_extern
+    |    B_bfexts_x0 CARG1, AT2, 0, 31
+    |    B_addli_x1 CFUNCADDR, DISPATCH, DISPATCH_GOT(__modsi3)
+    |  ld CFUNCADDR, CFUNCADDR
+    |  B_X
+    |    B_bfexts_x0 CARG2, AT3, 0, 31
+    |    B_jalr_x1 CFUNCADDR
     |  move AT5, zero
     |.endif
     |  B_X
@@ -5426,8 +5426,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next2
     |1:
     |  beqz AT4, ->vmeta_arith
-    |  ld AT2, CARG3
-    |  ld AT3, CARG4
     |.if "ins" == "add"
     |  fdouble_add_flags AT, AT2, AT3
     |  fdouble_unpack_min AT1, AT2, AT3
@@ -5800,37 +5798,34 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_addlo_x0 UPVAL:RB, LFUNC:RA->uvptr
     |    B_ld_x1 AT2, RD
     |  ld4u UPVAL:RB, UPVAL:RB
-    |  addlo TMP3, UPVAL:RB->marked
+    |  B_X
+    |    B_addlo_x0 TMP0, UPVAL:RB->closed
+    |    B_addlo_x1 TMP3, UPVAL:RB->marked
     |  B_X
     |    B_addlo_x0 CARG2, UPVAL:RB->v
     |    B_ld1u_x1 TMP3, TMP3
     |  B_X
-    |    B_andi_x0 TMP3, TMP3, LJ_GC_BLACK	// isblack(uv)
-    |    B_ld4u_x1 CARG2, CARG2
-    |  addlo TMP0, UPVAL:RB->closed
-    |  B_X
-    |    B_addi_x0 TMP2, RD, HI
+    |    B_shrsi_x0 TMP2, AT2, 32
     |    B_ld1u_x1 TMP0, TMP0
     |  B_X
-    |    B_or_x0 TMP3, TMP3, TMP0
-    |    B_ld4s_x1 TMP2, TMP2
+    |    B_andi_x0 TMP3, TMP3, LJ_GC_BLACK	// isblack(uv)
+    |    B_ld4u_x1 CARG2, CARG2
     |  B_X
-    |    B_addi_x0 AT, zero, LJ_GC_BLACK|1
+    |    B_or_x0 TMP3, TMP3, TMP0
     |    B_st_x1 CARG2, AT2
-    |  cmpeq AT, TMP3, AT
+    |  cmpeqi AT, TMP3, LJ_GC_BLACK|1
     |  bnez AT, >2			// Upvalue is closed and black?
     |1:
     |  ins_next
     |
     |2:  // Check if new value is collectable.
-    |  addi AT, zero, LJ_TISGCV
+    |  B_X
+    |    B_addi_x0 AT, zero, LJ_TISGCV
+    |    B_ld4s_x1 TMP1, RD
     |  B_X
     |    B_sub_x0 AT2, TMP2, AT
     |    B_sub_x1 AT3, TISNUM, AT
-    |  B_X
-    |    B_cmpleu_x0 AT, AT2, AT3
-    |    B_addi_x1 TMP1, RD, LO
-    |  ld4s TMP1, TMP1
+    |  cmpleu AT, AT2, AT3
     |  B_X
     |    B_addlo_x0 TMP3, GCOBJ:TMP1->gch.marked
     |    B_bnez_x1 AT, <1			// tvisgcv(v)
@@ -6127,23 +6122,22 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_shli_x0 RC, RC, 3
     |    B_add_x1 CARG2, BASE, RB
-    |  ld4s TAB:RB, CARG2
     |  B_X
     |    B_add_x0 CARG3, BASE, RC
-    |    B_addi_x1 TMP1, CARG2, HI
-    |  B_X
-    |    B_addi_x0 TMP2, CARG3, HI
-    |    B_ld4s_x1 TMP1, TMP1
+    |    B_ld_x1 TAB:RB, CARG2
+    |  ld RC, CARG3
     |  B_X
     |    B_addi_x0 AT, zero, LJ_TTAB
-    |    B_ld4s_x1 TMP2, TMP2
-    |  B_X
-    |    B_add_x0 RA, BASE, RA
-    |    B_ld4s_x1 RC, CARG3
+    |    B_add_x1 RA, BASE, RA
+    |  shrsi TMP1, TAB:RB, 32
+    |  bfexts TAB:RB, TAB:RB, 0, 31
     |  B_X
     |    B_addlo_x0 TAB:TMP3, TAB:RB->metatable
     |    B_cmpne_x1 AT, TMP1, AT
-    |  bnez AT, ->vmeta_tgetv
+    |  shrsi TMP2, RC, 32
+    |  B_X
+    |    B_bfexts_x0 RC, RC, 0, 31
+    |    B_bnez_x1 AT, ->vmeta_tgetv
     |  B_Y2
     |    B_addi_y0 AT1, zero, -5 //LJ_TSTR
     |    B_cmpne_y1 AT, TMP2, TISNUM
@@ -6164,11 +6158,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_add_x0 TMP2, TMP1, TMP2
     |    B_beqz_x1 AT, ->vmeta_tgetv		// Integer key and in array part?
     |  B_X
-    |    B_addi_x0 TMP0, TMP2, HI
+    |    B_cmpeq_x0 AT, TMP0, TISNIL
     |    B_ld_x1 AT2, TMP2
-    |  ld4s TMP0, TMP0
-    |  cmpeq AT, TMP0, TISNIL
-    |  bnez AT, >2
+    |  B_X
+    |    B_shrsi_x0 TMP0, AT2, 32
+    |    B_bnez_x1 AT, >2
     |1:
     |  ins_next1
     |  st RA, AT2
@@ -6445,27 +6439,29 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.if DUALNUM
     |  // RA = src*8, RB = table*8, RC = key*8
     |  decode_RB8a RB, INS
-    |  decode_RB8b RB
-    |  //decode_RDtoRC8 RC, RD
+    |  //decode_RB8b RB
+    |  bfextu RB, RB, 3, 10
     |  B_X
     |    B_bfextu_x0 RC, RD, 3, 10
-    |    B_add_x1 CARG2, BASE, RB
+    |    B_shli_x1 RB, RB, 3
     |  B_X
-    |    B_shli_x0 RC, RC, 3
-    |    B_addi_x1 TMP1, CARG2, HI
+    |    B_add_x0 CARG2, BASE, RB
+    |    B_shli_x1 RC, RC, 3
     |  B_X
     |    B_add_x0 CARG3, BASE, RC
-    |    B_ld4s_x1 TMP1, TMP1
+    |    B_ld_x1 TAB:RB, CARG2
     |  B_X
-    |    B_addi_x0 TMP2, CARG3, HI
-    |    B_ld4s_x1 TAB:RB, CARG2
+    |    B_shrsi_x0 TMP1, TAB:RB, 32
+    |    B_ld_x1 RC, CARG3
     |  B_X
-    |    B_addi_x0 AT, zero, LJ_TTAB
-    |    B_ld4s_x1 TMP2, TMP2
+    |    B_bfexts_x0 TAB:RB, TAB:RB, 0, 31
+    |    B_shrsi_x1 TMP2, RC, 32
+    |  B_X
+    |    B_bfexts_x0 RC, RC, 0, 31
+    |    B_addi_x1 AT, zero, LJ_TTAB
     |  B_X
     |    B_add_x0 RA, BASE, RA
-    |    B_ld4s_x1 RC, CARG3
-    |  cmpne AT, TMP1, AT
+    |    B_cmpne_x1 AT, TMP1, AT
     |  bnez AT, ->vmeta_tsetv
     |  B_X
     |    B_cmpne_x0 AT1, TMP2, TISNUM
