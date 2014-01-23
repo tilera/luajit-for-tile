@@ -4481,13 +4481,13 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_addi_x0 TMP2, PC, OFS_RD
     |    B_ld4s_x1 TMP0, TMP0
     |  B_X
-    |    B_cmpne_x0 AT, TMP0, TISNUM
+    |    B_moveli_x0 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
     |    B_ld4s_x1 TMP1, TMP1
     |  B_X
-    |    B_moveli_x0 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |    B_addi_x0 PC, PC, 4
     |    B_ld4s_x1 AT3, CARG3
     |  B_X
-    |    B_addi_x0 PC, PC, 4
+    |    B_cmpne_x0 AT, TMP0, TISNUM
     |    B_ld2u_x1 TMP2, TMP2
     |  B_X
     |    B_cmpne_x0 AT1, TMP1, TISNUM
@@ -5311,19 +5311,19 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    //decode_RDtoRC8 RC, RD
     |    B_bfextu_x0 RC, RD, 3, 10
     |    B_shli_x1 RB, RB, 3
-    |  shli RC, RC, 3
     |  // RA = dst*8, RB = src1*8, RC = src2*8 | num_const*8
     ||switch (vk) {
     ||case 0:
     |  B_X
     |    B_add_x0 CARG3, BASE, RB
-    |    B_add_x1 CARG4, KBASE, RC
+    |    B_shli_x1 RC, RC, 3
     |  B_X
-    |    B_addi_x0 TMP1, CARG3, HI
+    |    B_add_x0 CARG4, KBASE, RC
     |    B_ld4s_x1 AT2, CARG3
     |  B_X
     |    B_addi_x0 TMP2, CARG4, HI
-    |    B_ld4s_x1 TMP1, TMP1
+    |    B_addi_x1 TMP1, CARG3, HI
+    |  ld4s TMP1, TMP1
     |  B_X
     |    B_cmpne_x0 AT, TMP1, TISNUM
     |    B_ld4s_x1 TMP2, TMP2
@@ -5339,13 +5339,14 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     ||case 1:
     |  B_X
     |    B_add_x0 CARG4, BASE, RB
-    |    B_add_x1 CARG3, KBASE, RC
+    |    B_shli_x1 RC, RC, 3
     |  B_X
-    |    B_addi_x0 TMP1, CARG4, HI
+    |    B_add_x0 CARG3, KBASE, RC
     |    B_ld4s_x1 AT3, CARG4
     |  B_X
-    |    B_addi_x0 TMP2, CARG3, HI
-    |    B_ld4s_x1 TMP1, TMP1
+    |    B_addi_x0 TMP1, CARG4, HI
+    |    B_addi_x1 TMP2, CARG3, HI
+    |  ld4s TMP1, TMP1
     |  B_X
     |    B_cmpne_x0 AT, TMP1, TISNUM
     |    B_ld4s_x1 TMP2, TMP2
@@ -5361,15 +5362,17 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     ||default:
     |  B_X
     |    B_add_x0 CARG3, BASE, RB
-    |    B_add_x1 CARG4, BASE, RC
-    |  addi TMP1, CARG3, HI
+    |    B_shli_x1 RC, RC, 3
+    |  B_X
+    |    B_add_x0 CARG4, BASE, RC
+    |    B_addi_x1 TMP1, CARG3, HI
     |  B_X
     |    B_addi_x0 TMP2, CARG4, HI
     |    B_ld4s_x1 TMP1, TMP1
+    |  ld4s TMP2, TMP2
     |  B_X
     |    B_cmpne_x0 AT, TMP1, TISNUM
-    |    B_ld4s_x1 TMP2, TMP2
-    |  ld4s AT2, CARG3
+    |    B_ld4s_x1 AT2, CARG3
     |  B_X
     |    B_cmpne_x0 AT1, TMP2, TISNUM
     |    B_ld4s_x1 AT3, CARG4
@@ -5380,11 +5383,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  and AT4, AT4, AT5
     ||  break;
     ||}
-    |  add RA, BASE, RA
     |.if "ins" == "div"
-    |  b >1
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_b_x1 >1
+    |.else
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_bnez_x1 AT, >1
     |.endif
-    |  bnez AT, >1
     |.if "ins" == "add"
     |  add CRET1, AT2, AT3
     |  B_X
@@ -5411,9 +5418,10 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  call_extern
     |  move AT5, zero
     |.endif
-    |  bnez AT5, ->vmeta_arith
+    |  B_X
+    |    B_v4int_l_x0 AT2, TISNUM, CRET1
+    |    B_bnez_x1 AT5, ->vmeta_arith
     |  ins_next1
-    |  v4int_l AT2, TISNUM, CRET1
     |  st RA, AT2
     |  ins_next2
     |1:
@@ -6133,11 +6141,14 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_add_x0 RA, BASE, RA
     |    B_ld4s_x1 RC, CARG3
-    |  cmpne AT, TMP1, AT
-    |  bnez AT, ->vmeta_tgetv
     |  B_X
-    |    B_cmpne_x0 AT, TMP2, TISNUM
-    |    B_addi_x1 AT1, zero, LJ_TSTR
+    |    B_addlo_x0 TAB:TMP3, TAB:RB->metatable
+    |    B_cmpne_x1 AT, TMP1, AT
+    |  bnez AT, ->vmeta_tgetv
+    |  B_Y2
+    |    B_addi_y0 AT1, zero, -5 //LJ_TSTR
+    |    B_cmpne_y1 AT, TMP2, TISNUM
+    |    B_ld4u_y2 TAB:TMP3, TAB:TMP3
     |  B_X
     |    B_addlo_x0 TMP0, TAB:RB->asize
     |    B_bnez_x1 AT, >5
@@ -6146,18 +6157,18 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_addlo_x0 TMP1, TAB:RB->array
     |    B_ld4u_x1 TMP0, TMP0
-    |  B_X
-    |    B_cmpltu_x0 AT, RC, TMP0
-    |    B_ld4u_x1 TMP1, TMP1
-    |  shli TMP2, RC, 3
+    |  B_Y2
+    |    B_shli_y0 TMP2, RC, 3
+    |    B_cmpltu_y1 AT, RC, TMP0
+    |    B_ld4u_y2 TMP1, TMP1
     |  B_X
     |    B_add_x0 TMP2, TMP1, TMP2
     |    B_beqz_x1 AT, ->vmeta_tgetv		// Integer key and in array part?
-    |  addi TMP0, TMP2, HI
-    |  ld4s TMP0, TMP0
     |  B_X
-    |    B_cmpeq_x0 AT, TMP0, TISNIL
+    |    B_addi_x0 TMP0, TMP2, HI
     |    B_ld_x1 AT2, TMP2
+    |  ld4s TMP0, TMP0
+    |  cmpeq AT, TMP0, TISNIL
     |  bnez AT, >2
     |1:
     |  ins_next1
@@ -6165,10 +6176,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next2
     |
     |2:  // Check for __index if table value is nil.
-    |  addlo TAB:TMP2, TAB:RB->metatable
-    |  ld4u TAB:TMP2, TAB:TMP2
-    |  beqz TAB:TMP2, <1		// No metatable: done.
-    |  addlo TMP0, TAB:TMP2->nomm
+    |  B_X
+    |    B_addlo_x0 TMP0, TAB:TMP3->nomm
+    |    B_beqz_x1 TAB:TMP3, <1		// No metatable: done.
     |  ld1u TMP0, TMP0
     |  andi TMP0, TMP0, 1<<MM_index
     |  bnez TMP0, <1			// 'no __index' flag set: done.
@@ -6438,20 +6448,21 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  decode_RB8a RB, INS
     |  decode_RB8b RB
     |  //decode_RDtoRC8 RC, RD
-    |  bfextu RC, RD, 3, 10
     |  B_X
-    |    B_shli_x0 RC, RC, 3
+    |    B_bfextu_x0 RC, RD, 3, 10
     |    B_add_x1 CARG2, BASE, RB
     |  B_X
-    |    B_add_x0 CARG3, BASE, RC
+    |    B_shli_x0 RC, RC, 3
     |    B_addi_x1 TMP1, CARG2, HI
     |  B_X
-    |    B_addi_x0 TMP2, CARG3, HI
+    |    B_add_x0 CARG3, BASE, RC
     |    B_ld4s_x1 TMP1, TMP1
-    |  ld4s TMP2, TMP2
+    |  B_X
+    |    B_addi_x0 TMP2, CARG3, HI
+    |    B_ld4s_x1 TAB:RB, CARG2
     |  B_X
     |    B_addi_x0 AT, zero, LJ_TTAB
-    |    B_ld4s_x1 TAB:RB, CARG2
+    |    B_ld4s_x1 TMP2, TMP2
     |  B_X
     |    B_add_x0 RA, BASE, RA
     |    B_ld4s_x1 RC, CARG3
@@ -6469,17 +6480,21 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_addlo_x0 TMP1, TAB:RB->array
     |    B_ld4u_x1 TMP0, TMP0
     |  B_X
-    |    B_cmpltu_x0 AT, RC, TMP0
+    |    B_addlo_x0 TAB:TMP2, TAB:RB->metatable
     |    B_ld4u_x1 TMP1, TMP1
-    |  shli TMP3, RC, 3
+    |  B_X
+    |    B_cmpltu_x0 AT, RC, TMP0
+    |    B_shli_x1 TMP3, RC, 3
     |  B_X
     |    B_add_x0 TMP1, TMP1, TMP3
     |    B_beqz_x1 AT, ->vmeta_tsetv		// Integer key and in array part?
-    |  addlo TMP3, TAB:RB->marked
     |  B_X
     |    B_addi_x0 TMP0, TMP1, HI
-    |    B_ld1u_x1 TMP3, TMP3
-    |  ld4s TMP0, TMP0
+    |    B_ld4u_x1 TAB:TMP2, TAB:TMP2
+    |  B_X
+    |    B_addlo_x0 TMP3, TAB:RB->marked
+    |    B_ld4s_x1 TMP0, TMP0
+    |  ld1u TMP3, TMP3
     |  B_X
     |    B_cmpeq_x0 AT, TMP0, TISNIL
     |    B_ld_x1 AT2, RA
@@ -6493,10 +6508,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next
     |
     |3:  // Check for __newindex if previous value is nil.
-    |  addlo TAB:TMP2, TAB:RB->metatable
-    |  ld4u TAB:TMP2, TAB:TMP2
-    |  beqz TAB:TMP2, <1		// No metatable: done.
-    |  addlo TMP2, TAB:TMP2->nomm
+    |  B_X
+    |    B_addlo_x0 TMP2, TAB:TMP2->nomm
+    |    B_beqz_x1 TAB:TMP2, <1		// No metatable: done.
     |  ld1u TMP2, TMP2
     |  andi TMP2, TMP2, 1<<MM_newindex
     |  bnez TMP2, <1			// 'no __newindex' flag set: done.
