@@ -5774,15 +5774,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_shrui_y1 RD, INS, 16
     |    B_ld4u_y2 AT1, AT1
     |  B_X
-    |    B_add_x0 RA, BASE, RA
+    |    B_add_x0 AT3, BASE, RA
     |    B_ld_x1 AT2, AT1
-    |  st RA, AT2
     |  B_X
     |    B_shrui_x0, RA, INS, 5
     |    B_ld_x1, AT, TMP0
     |  B_X
     |    B_bfextu_x0, RA, RA, 3, 10
     |    B_shli_x1, RD, RD, 3
+    |  st AT3, AT2
     |  B_X
     |    B_shli_x0, RA, RA, 3
     |    B_jr_x1, AT
@@ -5824,8 +5824,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |
     |2:  // Check if new value is collectable.
     |  addi AT, zero, LJ_TISGCV
-    |  sub AT2, TMP2, AT
-    |  sub AT3, TISNUM, AT
+    |  B_X
+    |    B_sub_x0 AT2, TMP2, AT
+    |    B_sub_x1 AT3, TISNUM, AT
     |  B_X
     |    B_cmpleu_x0 AT, AT2, AT3
     |    B_addi_x1 TMP1, RD, LO
@@ -6126,6 +6127,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_shli_x0 RC, RC, 3
     |    B_add_x1 CARG2, BASE, RB
+    |  ld4s TAB:RB, CARG2
     |  B_X
     |    B_add_x0 CARG3, BASE, RC
     |    B_addi_x1 TMP1, CARG2, HI
@@ -6133,11 +6135,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |    B_addi_x0 TMP2, CARG3, HI
     |    B_ld4s_x1 TMP1, TMP1
     |  B_X
-    |    B_addi_x0 TAB:RB, CARG2, LO
-    |    B_ld4s_x1 TMP2, TMP2
-    |  B_X
     |    B_addi_x0 AT, zero, LJ_TTAB
-    |    B_ld4s_x1 TAB:RB, TAB:RB
+    |    B_ld4s_x1 TMP2, TMP2
     |  B_X
     |    B_add_x0 RA, BASE, RA
     |    B_ld4s_x1 RC, CARG3
