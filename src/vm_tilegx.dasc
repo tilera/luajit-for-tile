@@ -2815,23 +2815,34 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Math library -------------------------------------------------------
   |
   |.ffunc_1 math_abs
-  |  cmpne AT, CARG3, TISNUM
-  |  cmpltu AT1, CARG3, TISNUM
+  |  B_X
+  |    B_cmpne_x0 AT, CARG3, TISNUM
+  |    B_cmpltu_x1 AT1, CARG3, TISNUM
   |.if DUALNUM
   |  bnez AT, >2
   |  bgez CARG1, ->fff_resi
   |  subx CARG1, zero, CARG1
   |  bltz CARG1, >1
-  |  b ->fff_resi
+  |  // inline "b ->fff_resi"
+  |  B_X
+  |    B_v4int_l_x0 CRET1, TISNUM, CRET1
+  |    B_addi_x1 PC, BASE, FRAME_PC
+  |  B_X
+  |    B_addli_x0 RA, BASE, -8
+  |    B_ld4s_x1 PC, PC
+  |  st RA, CRET1
+  |  b ->fff_res1
   |1:
   |  moveli CRET1, -8127
   |  bfextu CRET1, CRET1, 0, 15
-  |  revbytes CRET1, CRET1
-  |  b ->fff_resn
+  |  B_X
+  |    B_revbytes_x0 CRET1, CRET1
+  |    B_b_x1 ->fff_resn
   |2:
   |.endif
-  |  beqz AT1, ->fff_fallback
-  |  bfextu CRET1, CARG1, 0, 62
+  |  B_X
+  |    B_bfextu_x0 CRET1, CARG1, 0, 62
+  |    B_beqz_x1 AT1, ->fff_fallback
   |->fff_resn:
   |  addi PC, BASE, FRAME_PC
   |  B_X
@@ -3099,21 +3110,28 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc string_byte			// Only handle the 1-arg case here.
   |.if DUALNUM
-  |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |  ld4s STR:CARG1, BASE
-  |  xori AT, NARGS8:RC, 8
-  |  addli CARG3, CARG3, -LJ_TSTR
-  |  or AT, AT, CARG3
-  |  bnez AT, ->fff_fallback		// Need exactly 1 string argument.
-  |  addlo TMP0, STR:CARG1->len
-  |  ld4u TMP0, TMP0
-  |   addlo CARG1, STR:CARG1[1]		// Access is always ok (NUL at end).
-  |   ld1u CARG1, CARG1
-  |    addli RA, BASE, -8
-  |  addi RD, zero, 8
-  |  addi PC, BASE, FRAME_PC
-  |  ld4s PC, PC
+  |  B_X
+  |    B_addi_x0 CARG3, BASE, HI
+  |    B_ld4s_x1 STR:CARG1, BASE
+  |  B_X
+  |    B_xori_x0 AT, NARGS8:RC, 8
+  |    B_ld4s_x1 CARG3, CARG3
+  |  B_X
+  |    B_addli_x0 CARG3, CARG3, -LJ_TSTR
+  |    B_or_x1 AT, AT, CARG3
+  |  B_X
+  |    B_addlo_x0 TMP0, STR:CARG1->len
+  |    B_bnez_x1 AT, ->fff_fallback		// Need exactly 1 string argument.
+  |  B_X
+  |    B_addlo_x0 CARG1, STR:CARG1[1]		// Access is always ok (NUL at end).
+  |    B_ld4u_x1 TMP0, TMP0
+  |  B_Y1
+  |    B_addi_y0 RA, BASE, -8
+  |    B_addi_y1 PC, BASE, FRAME_PC
+  |    B_ld1u_y2 CARG1, CARG1
+  |  B_X
+  |    B_addi_x0 RD, zero, 8
+  |    B_ld4s_x1 PC, PC
   |  beqz TMP0, ->fff_res
   |  b ->fff_resi
   |.else
@@ -3161,18 +3179,23 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc string_char			// Only handle the 1-arg case here.
   |.if DUALNUM
   |  ffgccheck
-  |  addi CARG3, BASE, HI
-  |  ld4s CARG3, CARG3
-  |  ld4s TMP0, BASE
-  |  addi AT, zero, 8
-  |  cmpne AT, NARGS8:RC, AT
-  |  bnez AT, ->fff_fallback
-  |  cmpne AT1, CARG3, TISNUM
-  |  bnez AT1, ->fff_fallback
-  |  addi CARG3, zero, 1
-  |  addli AT, zero, 256
-  |  cmpltu AT, TMP0, AT
-  |  addi CARG2, sp, SAVE_MULTRES
+  |  B_Y2
+  |    B_addi_y0 CARG3, BASE, HI
+  |    B_addi_y1 AT2, zero, 1
+  |    B_ld4s_y2 TMP0, BASE
+  |  B_Y2
+  |    B_cmpeqi_y0 AT, NARGS8:RC, 8
+  |    B_shli_y1 AT2, AT2, 8 // 256
+  |    B_ld4s_y2 CARG3, CARG3
+  |  B_X
+  |    B_cmpne_x0 AT1, CARG3, TISNUM
+  |    B_beqz_x1 AT, ->fff_fallback
+  |  B_X
+  |    B_addi_x0 CARG3, zero, 1
+  |    B_bnez_x1 AT1, ->fff_fallback
+  |  B_X
+  |    B_cmpltu_x0 AT, TMP0, AT2
+  |    B_addi_x1 CARG2, sp, SAVE_MULTRES
   |  st4 CARG2, TMP0
   |  beqz AT, ->fff_fallback
   |.else
