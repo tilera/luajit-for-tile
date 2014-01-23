@@ -360,12 +360,12 @@ int dasm_encode(Dst_DECL, void *buffer)
 	  CK(n >= 0, UNDEF_LG);
 	case DASM_REL_PC_X1_BR:
 	case DASM_REL_PC_X1_J:
+	  /* J is actually PC relative branch in TILE-Gx, so no absolute
+	   * relocation for TILE-Gx currently.
+	   **/
 	  CK(n >= 0, UNDEF_PC);
 	  n = *DASM_POS2PTR(D, n);
-	  if (action == DASM_REL_LG_X1_BR || action == DASM_REL_PC_X1_BR)
-	    n = n - (long)((char *)cp - base) + 8;
-	  else
-	    n = (n + (long)base) & 0x0fffffff;
+	  n = n - (long)((char *)cp - base) + 8;
 	patchrel:
 	  //FIXME: enable this sanity check later.
 #if 0
