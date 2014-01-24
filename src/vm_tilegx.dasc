@@ -7618,40 +7618,49 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     vk = (op == BC_IFORL || op == BC_JFORL);
     |.if DUALNUM
     |  // Integer loop.
-    |  add RA, BASE, RA
-    |  ld4s CARG1, RA
-    |  addi TMP1, RA, FORL_IDX*8 + 4
-    |  ld4s TMP1, TMP1
-    |  cmpne AT, TMP1, TISNUM
+    |  B_X
+    |    B_add_x0 RA, BASE, RA
+    |    B_add_x1 AT6, BASE, RA
     if (vk) {
+      |  ld_add AT2, AT6, 8 //FORL_IDX
+      |  ld_add AT3, AT6, 8 //FORL_STOP
       |  B_X
-      |    B_addi_x0 CARG3, RA, FORL_STEP*8
+      |    B_shrsi_x0 TMP1, AT2, 32
+      |    B_ld_add_x1 AT4, AT6, 8 //FORL_STEP
+      |  B_X
+      |    B_bfexts_x0 CARG1, AT2, 0, 31
+      |    B_cmpne_x1 AT, TMP1, TISNUM
+      |  B_X
+      |    B_bfexts_x0 CARG3, AT4, 0, 31
       |    B_bnez_x1 AT, >9
-      |  ld4s CARG3, CARG3
       |  B_X
       |    B_add_x0 CARG1, CARG1, CARG3
       |    B_cmplts_x1 AT, CARG3, zero
-      |  addi CARG2, RA, FORL_STOP*8
-      |  ld4s CARG2, CARG2
       |4:
-      |  addi AT1, RA, FORL_IDX*8
-      |  st4 AT1, CARG1
+      |  B_X
+      |    B_bfexts_x0 CARG2, AT3, 0, 31
+      |    B_st4_x1 RA, CARG1
     } else {
+      |  //FORL_IDX*8
+      |  ld_add AT2, AT6, 8 //FORL_IDX
+      |  ld_add AT3, AT6, 8 //FORL_STOP
+      |  ld_add AT4, AT6, 8 //FORL_STEP
       |  B_X
-      |    B_addi_x0 TMP3, RA, FORL_STEP*8 + 4
-      |    B_addi_x1 CARG3, RA, FORL_STEP*8
+      |    B_bfexts_x0 CARG1, AT2, 0, 31
+      |    B_shrsi_x1 TMP1, AT2, 32
       |  B_X
-      |    B_addi_x0 TMP2, RA, FORL_STOP*8 + 4
-      |    B_ld4s_x1 TMP3, TMP3
+      |    B_cmpne_x0 AT, TMP1, TISNUM
+      |    B_shrsi_x1 TMP2, AT3, 32
       |  B_X
-      |    B_addi_x0 CARG2, RA, FORL_STOP*8
-      |    B_ld4s_x1 CARG3, CARG3
-      |  ld4s TMP2, TMP2
-      |  ld4s CARG2, CARG2
-      |  cmpne AT1, TMP3, TISNUM
-      |  or AT, AT, AT1
-      |  cmpne AT2, TMP2, TISNUM
-      |  or AT1, AT, AT2
+      |    B_bfexts_x0 CARG2, AT3, 0, 31
+      |    B_shrsi_x1 TMP3, AT4, 32
+      |  B_X
+      |    B_bfexts_x0 CARG3, AT4, 0, 31
+      |    B_cmpne_x1 AT1, TMP3, TISNUM
+      |  B_X
+      |    B_or_x0 AT, AT, AT1
+      |    B_cmpne_x1 AT5, TMP2, TISNUM
+      |  or AT1, AT, AT5
       |  B_X
       |    B_cmplts_x0 AT, CARG3, zero
       |    B_bnez_x1 AT1, >9
@@ -7704,19 +7713,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add RA, BASE, RA
     if (vk) {
       |9:
-      |  addi AT2, RA, FORL_IDX*8
-      |  B_X
-      |    B_addi_x0 AT4, RA, FORL_STEP*8
-      |    B_ld_x1 AT2, AT2
-      |  B_X
-      |    B_addi_x0 AT3, RA, FORL_STOP*8
-      |    B_ld_x1 AT4, AT4
-      |  B_X
-      |    B_addi_x0 TMP3, RA, FORL_STEP*8+HI
-      |    B_ld_x1 AT3, AT3
       |  B_X
       |    B_fdouble_add_flags_x0 AT, AT2, AT4
-      |    B_ld4s_x1 TMP3, TMP3
+      |    B_shrsi_x1 TMP3, AT4, 32
       |  fdouble_unpack_min AT1, AT2, AT4
       |  fdouble_unpack_max AT4, AT2, AT4
       |  fdouble_addsub AT4, AT1, AT
@@ -7727,27 +7726,17 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  st AT, AT2
     } else {
       |9:
-      |  addi TMP1, RA, FORL_IDX*8+HI
       |  B_X
-      |    B_addi_x0 TMP3, RA, FORL_STEP*8+HI
-      |    B_ld4s_x1 TMP1, TMP1
-      |  B_X
-      |    B_addi_x0 TMP2, RA, FORL_STOP*8+HI
-      |    B_ld4s_x1 TMP3, TMP3
+      |    B_shrsi_x0 TMP1, AT2, 32
+      |    B_shrsi_x1 TMP2, AT3, 32
       |  B_X
       |    B_cmpltu_x0 TMP1, TMP1, TISNUM
-      |    B_ld4s_x1 TMP2, TMP2
+      |    B_shrsi_x1 TMP3, AT4, 32
       |  B_X
       |    B_cmpltu_x0 TMP0, TMP3, TISNUM
       |    B_cmpltu_x1 TMP2, TMP2, TISNUM
       |  and TMP1, TMP1, TMP0
-      |  B_X
-      |    B_and_x0 TMP1, TMP1, TMP2
-      |    B_addi_x1 AT2, RA, FORL_IDX*8
-      |  B_X
-      |    B_addi_x0 AT3, RA, FORL_STOP*8
-      |    B_ld_x1 AT2, AT2
-      |  ld AT3, AT3
+      |  and TMP1, TMP1, TMP2
       |  beqz TMP1, ->vmeta_for
     }
     if (op != BC_JFORL) {
