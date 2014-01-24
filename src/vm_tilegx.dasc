@@ -4532,33 +4532,34 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_add_x0 CARG3, BASE, RD
     |    B_add_x1 CARG2, BASE, RA
-    |  ld AT2, CARG2
-    |  ld AT3, CARG3
     |  B_X
-    |    B_shrsi_x0 TMP0, AT2, 32
-    |    B_shrsi_x1 TMP1, AT3, 32
+    |    B_addi_x0 TMP2, PC, OFS_RD
+    |    B_ld_x1 AT2, CARG2
     |  B_X
-    |    B_bfexts_x0 AT2, AT2, 0, 31
-    |    B_addi_x1 TMP2, PC, OFS_RD
+    |    B_moveli_x0 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |    B_ld_x1 AT3, CARG3
+    |  B_X
+    |    B_addi_x0 PC, PC, 4
+    |    B_shl16insli_x1 TMP3, TMP3, 0
     |  B_Y1
-    |    B_addi_y0 PC, PC, 4
-    |    B_cmpne_y1 AT, TMP0, TISNUM
+    |    B_shrsi_y0 TMP0, AT2, 32
+    |    B_shrsi_y1 TMP1, AT3, 32
     |    B_ld2u_y2 TMP2, TMP2
     |  B_X
-    |    B_bfexts_x0 AT3, AT3, 0, 31
-    |    B_moveli_x1 TMP3, (-(BCBIAS_J*4 >> 16) & 65535)
+    |    B_bfexts_x0 AT5, AT2, 0, 31
+    |    B_cmpne_x1 AT, TMP0, TISNUM
     |  B_X
-    |    B_cmpne_x0 AT1, TMP1, TISNUM
-    |    B_shl16insli_x1 TMP3, TMP3, 0
+    |    B_bfexts_x0 AT6, AT3, 0, 31
+    |    B_cmpne_x1 AT1, TMP1, TISNUM
     |  decode_RD4b TMP2
     |  B_X
     |    B_add_x0 TMP2, TMP2, TMP3
     |    B_bnez_x1 AT, >2
     |  bnez AT1, >3
     if (op == BC_ISLT || op == BC_ISGE) {
-      |  cmplts AT, AT2, AT3
+      |  cmplts AT, AT5, AT6
     } else {
-      |  cmples AT, AT2, AT3
+      |  cmples AT, AT5, AT6
     }
     if (op == BC_ISLT || op == BC_ISLE) {
       |  cmoveqz TMP2, AT, zero
@@ -4570,23 +4571,23 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_next
     |2:  // RA is not an integer.
     |  cmpltu AT, TISNUM, TMP0
-    |  bnez AT, ->vmeta_comp
     |  B_X
     |    B_cmpltu_x0 AT, TISNUM, TMP1
-    |    B_ld_x1 AT2, CARG2
+    |    B_bnez_x1 AT, ->vmeta_comp
     |  B_X
     |    B_cmpltu_x0 AT, TMP1, TISNUM
     |    B_bnez_x1 AT, ->vmeta_comp
     |  bnez AT, >4
-    |  fixsidf_inline AT3, AT, AT1, AT4
-    |  b >5
+    |  fixsidf_inline AT6, AT, AT1, AT4
+    |  B_X
+    |    B_move_x0 AT3, AT6
+    |    B_b_x1 >4
     |3:  // RA is an integer, RD is not an integer.
     |  cmpltu AT, TISNUM, TMP1
     |  bnez AT, ->vmeta_comp
-    |  fixsidf_inline AT2, AT, AT1, AT4
+    |  fixsidf_inline AT5, AT, AT1, AT4
+    |  move AT2, AT5
     |4:
-    |  ld AT3, CARG3
-    |5:
     |  fdouble_add_flags AT, AT2, AT3
     if (op == BC_ISLT || op == BC_ISGE) {
       |  bfextu AT, AT, 26, 26
@@ -6182,8 +6183,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  B_X
     |    B_addi_x0 AT, zero, LJ_TTAB
     |    B_add_x1 RA, BASE, RA
-    |  shrsi TMP1, TAB:RB, 32
-    |  bfexts TAB:RB, TAB:RB, 0, 31
+    |  B_X
+    |    B_bfexts_x0 TAB:RB, TAB:RB, 0, 31
+    |    B_shrsi_x1 TMP1, TAB:RB, 32
     |  B_X
     |    B_addlo_x0 TAB:TMP3, TAB:RB->metatable
     |    B_cmpne_x1 AT, TMP1, AT
